@@ -1,0 +1,735 @@
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker registered:', reg.scope))
+      .catch(err => console.error('Service Worker registration failed:', err));
+  });
+}
+
+/**
+ * Main Application Controller for Blood Pressure Diary
+ */
+document.addEventListener('DOMContentLoaded', () => {
+  // --- Initialize App State ---
+  // Seed mockup data on first open if empty
+  if (BPStorage.getAll().length === 0) {
+    BPStorage.seedMockupData();
+  }
+
+  // --- UI Elements ---
+  const views = {
+    dashboard: document.getElementById('view-dashboard'),
+    history: document.getElementById('view-history'),
+    analytics: document.getElementById('view-analytics'),
+    settings: document.getElementById('view-settings')
+  };
+
+  const navItems = document.querySelectorAll('.bottom-nav .nav-item:not(.fab-button)');
+  const fabButton = document.getElementById('btn-quick-add-fab');
+  const headerAddBtn = document.getElementById('btn-quick-add-header');
+
+  // Modal elements
+  const modalOverlay = document.getElementById('record-modal-overlay');
+  const modalCloseBtn = document.getElementById('btn-modal-close');
+  const recordForm = document.getElementById('record-form');
+  const modalTitle = document.getElementById('modal-form-title');
+  const inputId = document.getElementById('input-record-id');
+  const inputSys = document.getElementById('input-sys');
+  const inputDia = document.getElementById('input-dia');
+  const inputPulse = document.getElementById('input-pulse');
+  const inputDatetime = document.getElementById('input-datetime');
+  const inputNotes = document.getElementById('input-notes');
+  const selectMorningBtn = document.getElementById('btn-select-morning');
+  const selectEveningBtn = document.getElementById('btn-select-evening');
+
+  // Dashboard elements
+  const dashMorningBP = document.getElementById('dash-morning-bp');
+  const dashMorningStatus = document.getElementById('dash-morning-status');
+  const dashEveningBP = document.getElementById('dash-evening-bp');
+  const dashEveningStatus = document.getElementById('dash-evening-status');
+  const dashRecordCount = document.getElementById('dash-record-count');
+  const dashRecentList = document.getElementById('dashboard-recent-list');
+  const dashGraphWrapper = document.getElementById('dashboard-graph');
+
+  // History elements
+  const fullHistoryList = document.getElementById('full-history-list');
+
+  // Analytics elements
+  const analyticsGraphWrapper = document.getElementById('analytics-graph');
+  const statMaxSys = document.getElementById('stat-max-sys');
+  const statMinSys = document.getElementById('stat-min-sys');
+  const statMaxDia = document.getElementById('stat-max-dia');
+  const statMinDia = document.getElementById('stat-min-dia');
+  const statAveragePulse = document.getElementById('stat-average-pulse');
+  const statRecordCount = document.getElementById('stat-record-count');
+
+  // Settings elements
+  const settingsExportBtn = document.getElementById('settings-export-csv');
+  const settingsImportInput = document.getElementById('csv-file-input');
+  const settingsSeedBtn = document.getElementById('settings-seed-mockup');
+  const settingsDeleteAllBtn = document.getElementById('settings-delete-all');
+
+  // Wallpaper elements
+  const wallpaperPresets = document.querySelectorAll('#wallpaper-presets .preset-btn');
+  const btnUploadWallpaper = document.getElementById('btn-upload-wallpaper');
+  const wallpaperFileInput = document.getElementById('wallpaper-file-input');
+  const btnResetWallpaper = document.getElementById('btn-reset-wallpaper');
+
+  // Average Calculator elements
+  const btnToggleCalc = document.getElementById('btn-toggle-calc');
+  const calcFields = document.getElementById('calc-fields');
+  const calcToggleIcon = document.getElementById('calc-toggle-icon');
+  const btnClearCalc = document.getElementById('btn-clear-calc');
+  const calcAutoNotes = document.getElementById('calc-auto-notes');
+
+  const calcInputs = {
+    sys: [document.getElementById('calc-sys-1'), document.getElementById('calc-sys-2'), document.getElementById('calc-sys-3')],
+    dia: [document.getElementById('calc-dia-1'), document.getElementById('calc-dia-2'), document.getElementById('calc-dia-3')],
+    pulse: [document.getElementById('calc-pulse-1'), document.getElementById('calc-pulse-2'), document.getElementById('calc-pulse-3')]
+  };
+
+  // Toast
+  const toast = document.getElementById('toast-message');
+  const toastText = document.getElementById('toast-text');
+  const toastIcon = document.getElementById('toast-icon');
+
+  // Keep track of current timing type ('morning' or 'evening')
+  let selectedTiming = 'morning';
+  let currentActiveView = 'dashboard';
+  let activeDashDays = 7;
+  let activeAnalyticsDays = 7;
+  let activeAnalyticsType = 'all';
+
+  // --- Average Calculator Logic ---
+  // Toggle Calculator Accordion
+  btnToggleCalc.addEventListener('click', () => {
+    const isHidden = calcFields.style.display === 'none';
+    calcFields.style.display = isHidden ? 'flex' : 'none';
+    calcToggleIcon.textContent = isHidden ? '▲' : '▼';
+  });
+
+  // Calculate and Apply Average
+  const calculateAverage = () => {
+    const getAvg = (inputs) => {
+      const vals = inputs.map(i => Number(i.value)).filter(v => v > 0);
+      if (vals.length === 0) return '';
+      const sum = vals.reduce((a, b) => a + b, 0);
+      return Math.round(sum / vals.length);
+    };
+
+    const avgSys = getAvg(calcInputs.sys);
+    const avgDia = getAvg(calcInputs.dia);
+    const avgPulse = getAvg(calcInputs.pulse);
+
+    if (avgSys !== '') inputSys.value = avgSys;
+    if (avgDia !== '') inputDia.value = avgDia;
+    if (avgPulse !== '') inputPulse.value = avgPulse;
+
+    // Auto record notes if checked
+    if (calcAutoNotes.checked) {
+      const notesParts = [];
+      for (let i = 0; i < 3; i++) {
+        const s = calcInputs.sys[i].value;
+        const d = calcInputs.dia[i].value;
+        const p = calcInputs.pulse[i].value;
+        if (s || d || p) {
+          notesParts.push(`${i+1}回:${s || '-'}/${d || '-'}(脈${p || '-'})`);
+        }
+      }
+      if (notesParts.length > 0) {
+        inputNotes.value = `[複数回平均] ${notesParts.join(' ')}`;
+      }
+    }
+  };
+
+  // Attach input event listeners
+  const allCalcInputs = [...calcInputs.sys, ...calcInputs.dia, ...calcInputs.pulse];
+  allCalcInputs.forEach(input => {
+    input.addEventListener('input', calculateAverage);
+  });
+
+  // Clear Calculator
+  const clearCalculator = () => {
+    allCalcInputs.forEach(i => i.value = '');
+    calcFields.style.display = 'none';
+    calcToggleIcon.textContent = '▼';
+    if (inputNotes.value.startsWith('[複数回平均]')) {
+      inputNotes.value = '';
+    }
+  };
+
+  btnClearCalc.addEventListener('click', clearCalculator);
+
+  // --- Helper: Format Datetime for input ---
+  const getLocalDateTimeString = (dateObj = new Date()) => {
+    const tzOffset = dateObj.getTimezoneOffset() * 60000;
+    return new Date(dateObj.getTime() - tzOffset).toISOString().slice(0, 16);
+  };
+
+  // --- Helper: Toast Notification ---
+  const showToast = (message, isSuccess = true) => {
+    toastText.textContent = message;
+    if (isSuccess) {
+      toastIcon.style.color = 'var(--color-success)';
+      toastIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />`;
+    } else {
+      toastIcon.style.color = 'var(--color-danger)';
+      toastIcon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />`;
+    }
+    
+    toast.classList.add('show');
+    setTimeout(() => {
+      toast.classList.remove('show');
+    }, 2800);
+  };
+
+  // --- Helper: Get time label from ISO string ---
+  const formatTimeLabel = (isoString) => {
+    const d = new Date(isoString);
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  // --- Helper: Get Date short label ---
+  const formatDateShort = (isoString) => {
+    const d = new Date(isoString);
+    const month = d.getMonth() + 1;
+    const date = d.getDate();
+    const dayOfWeek = ['日', '月', '火', '水', '木', '金', '土'][d.getDay()];
+    return {
+      monthDay: `${month}/${date}`,
+      day: String(date).padStart(2, '0'),
+      dayOfWeek: `(${dayOfWeek})`
+    };
+  };
+
+  // --- View Controller: Switch views ---
+  const switchView = (targetViewId) => {
+    // Hide all views and remove active class from nav
+    Object.values(views).forEach(v => v.classList.remove('active'));
+    navItems.forEach(item => item.classList.remove('active'));
+
+    // Show target view
+    const targetView = views[targetViewId];
+    if (targetView) {
+      targetView.classList.add('active');
+      currentActiveView = targetViewId;
+    }
+
+    // Set active nav item
+    const navBtn = Array.from(navItems).find(btn => btn.getAttribute('data-view') === targetViewId);
+    if (navBtn) {
+      navBtn.classList.add('active');
+    }
+
+    // Refresh view data
+    refreshViewData();
+  };
+
+  // Attach nav click handlers
+  navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const target = item.getAttribute('data-view');
+      switchView(target);
+    });
+  });
+
+  // --- Modal Controllers ---
+  const openModal = (record = null) => {
+    clearCalculator();
+    if (record) {
+      // Edit mode
+      modalTitle.textContent = '記録を編集する';
+      inputId.value = record.id;
+      inputSys.value = record.sys;
+      inputDia.value = record.dia;
+      inputPulse.value = record.pulse;
+      inputDatetime.value = record.timestamp.slice(0, 16);
+      inputNotes.value = record.notes || '';
+      
+      setTimingType(record.type);
+    } else {
+      // New mode
+      modalTitle.textContent = '血圧を記録する';
+      inputId.value = '';
+      inputSys.value = '';
+      inputDia.value = '';
+      inputPulse.value = '';
+      
+      const now = new Date();
+      inputDatetime.value = getLocalDateTimeString(now);
+      inputNotes.value = '';
+
+      // Auto-set timing based on current hour
+      const hour = now.getHours();
+      setTimingType((hour >= 4 && hour < 12) ? 'morning' : 'evening');
+    }
+
+    modalOverlay.classList.add('active');
+  };
+
+  const closeModal = () => {
+    modalOverlay.classList.remove('active');
+    recordForm.reset();
+    clearCalculator();
+  };
+
+  const setTimingType = (type) => {
+    selectedTiming = type;
+    if (type === 'morning') {
+      selectMorningBtn.classList.add('active');
+      selectEveningBtn.classList.remove('active');
+    } else {
+      selectMorningBtn.classList.remove('active');
+      selectEveningBtn.classList.add('active');
+    }
+  };
+
+  selectMorningBtn.addEventListener('click', () => setTimingType('morning'));
+  selectEveningBtn.addEventListener('click', () => setTimingType('evening'));
+
+  fabButton.addEventListener('click', () => openModal());
+  headerAddBtn.addEventListener('click', () => openModal());
+  modalCloseBtn.addEventListener('click', closeModal);
+
+  // Close modal when tapping outside content
+  modalOverlay.addEventListener('click', (e) => {
+    if (e.target === modalOverlay) closeModal();
+  });
+
+  // Handle Form Submission
+  recordForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    const record = {
+      sys: Number(inputSys.value),
+      dia: Number(inputDia.value),
+      pulse: Number(inputPulse.value),
+      timestamp: new Date(inputDatetime.value).toISOString(),
+      type: selectedTiming,
+      notes: inputNotes.value.trim()
+    };
+
+    if (inputId.value) {
+      record.id = inputId.value;
+    }
+
+    // Save record
+    BPStorage.save(record);
+    
+    // Close modal & notify
+    closeModal();
+    showToast(record.id ? '記録を更新しました' : '血圧を記録しました');
+
+    // Refresh view
+    refreshViewData();
+  });
+
+  // --- Dynamic UI Renderers ---
+
+  /**
+   * Refreshes the active view with latest database records
+   */
+  const refreshViewData = () => {
+    const allRecords = BPStorage.getAll();
+
+    if (currentActiveView === 'dashboard') {
+      renderDashboard(allRecords);
+    } else if (currentActiveView === 'history') {
+      renderHistoryList(allRecords);
+    } else if (currentActiveView === 'analytics') {
+      renderAnalytics(allRecords);
+    }
+  };
+
+  /**
+   * Render Dashboard View
+   */
+  const renderDashboard = (records) => {
+    // 1. Render stats (7-day averages)
+    const stats7 = BPStorage.getStats(7);
+
+    // Morning Averaging
+    if (stats7.morning.count > 0) {
+      dashMorningBP.innerHTML = `${stats7.morning.avgSys}/${stats7.morning.avgDia}<span class="unit">mmHg</span>`;
+      const bpClass = BPStorage.classify(stats7.morning.avgSys, stats7.morning.avgDia);
+      dashMorningStatus.textContent = bpClass.label;
+      dashMorningStatus.className = `status ${bpClass.colorClass}`;
+    } else {
+      dashMorningBP.innerHTML = `--/--<span class="unit">mmHg</span>`;
+      dashMorningStatus.textContent = 'データなし';
+      dashMorningStatus.className = 'status';
+    }
+
+    // Evening Averaging
+    if (stats7.evening.count > 0) {
+      dashEveningBP.innerHTML = `${stats7.evening.avgSys}/${stats7.evening.avgDia}<span class="unit">mmHg</span>`;
+      const bpClass = BPStorage.classify(stats7.evening.avgSys, stats7.evening.avgDia);
+      dashEveningStatus.textContent = bpClass.label;
+      dashEveningStatus.className = `status ${bpClass.colorClass}`;
+    } else {
+      dashEveningBP.innerHTML = `--/--<span class="unit">mmHg</span>`;
+      dashEveningStatus.textContent = 'データなし';
+      dashEveningStatus.className = 'status';
+    }
+
+    // Total records count
+    dashRecordCount.textContent = `${records.length}件`;
+
+    // 2. Render SVG Graph
+    BPGraph.render(dashGraphWrapper, records, 'all', activeDashDays);
+
+    // 3. Render recent 3 records
+    const recent = records.slice(0, 3);
+    if (recent.length === 0) {
+      dashRecentList.innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          <p style="font-size: 0.8rem; margin-top: 6px;">記録はありません。「記録する」から登録してください。</p>
+        </div>
+      `;
+    } else {
+      dashRecentList.innerHTML = '';
+      recent.forEach(r => {
+        dashRecentList.appendChild(createHistoryCard(r));
+      });
+    }
+  };
+
+  /**
+   * Render History Tab View
+   */
+  const renderHistoryList = (records) => {
+    if (records.length === 0) {
+      fullHistoryList.innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.375c1.88 0 3.43-1.55 3.43-3.43V9c0-1.88-1.55-3.43-3.43-3.43H9m0 16.5V2.25M3 6.75h18" />
+          </svg>
+          <p style="font-size: 0.85rem; margin-top: 8px;">データが登録されていません。</p>
+        </div>
+      `;
+      return;
+    }
+
+    fullHistoryList.innerHTML = '';
+    records.forEach(r => {
+      fullHistoryList.appendChild(createHistoryCard(r));
+    });
+  };
+
+  /**
+   * Render Analytics View
+   */
+  const renderAnalytics = (records) => {
+    // 1. Render detailed SVG Graph
+    BPGraph.render(analyticsGraphWrapper, records, activeAnalyticsType, activeAnalyticsDays);
+
+    // 2. Fetch stats for summary panel
+    const stats = BPStorage.getStats(activeAnalyticsDays);
+    const activeStats = activeAnalyticsType === 'all' ? stats.overall : stats[activeAnalyticsType];
+
+    if (activeStats.count > 0) {
+      statMaxSys.innerHTML = `${activeStats.maxSys} <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">mmHg</span>`;
+      statMinSys.textContent = `最低: ${activeStats.minSys} mmHg`;
+
+      statMaxDia.innerHTML = `${activeStats.maxDia} <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">mmHg</span>`;
+      statMinDia.textContent = `最低: ${activeStats.minDia} mmHg`;
+
+      statAveragePulse.textContent = `平均脈拍数: ${activeStats.avgPulse} bpm`;
+      statRecordCount.textContent = `測定回数: ${activeStats.count} 回`;
+    } else {
+      statMaxSys.innerHTML = `-- <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">mmHg</span>`;
+      statMinSys.textContent = '最低: -- mmHg';
+
+      statMaxDia.innerHTML = `-- <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">mmHg</span>`;
+      statMinDia.textContent = '最低: -- mmHg';
+
+      statAveragePulse.textContent = '平均脈拍数: -- bpm';
+      statRecordCount.textContent = '測定回数: 0 回';
+    }
+  };
+
+  /**
+   * Create dynamic HTML structure for a single history entry card
+   */
+  const createHistoryCard = (r) => {
+    const card = document.createElement('div');
+    card.className = 'glass-panel history-card no-press';
+    card.setAttribute('data-id', r.id);
+
+    const bpClass = BPStorage.classify(r.sys, r.dia);
+    const dateMeta = formatDateShort(r.timestamp);
+    const timeLabel = formatTimeLabel(r.timestamp);
+    
+    const timingClass = r.type === 'morning' ? 'morning' : 'evening';
+    const timingName = r.type === 'morning' ? '朝' : '夜';
+
+    card.innerHTML = `
+      <div class="history-time-badge ${timingClass}">
+        <span class="day">${dateMeta.day}</span>
+        <span style="font-size: 0.65rem; color: var(--text-muted); font-weight:500;">${dateMeta.monthDay}</span>
+      </div>
+      <div class="history-data">
+        <div class="history-values">
+          <span class="sys-dia">${r.sys}/${r.dia}</span>
+          <span class="pulse">脈 ${r.pulse}</span>
+        </div>
+        <div class="history-meta">
+          <span class="status ${bpClass.colorClass}" style="font-size: 0.65rem; padding: 1px 6px;">${bpClass.label}</span>
+          <span>${timingName} ${timeLabel}</span>
+          ${r.notes ? `<span style="color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;" title="${r.notes}">• ${r.notes}</span>` : ''}
+        </div>
+      </div>
+      <div class="history-actions">
+        <button class="icon-btn btn-edit" title="編集">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Zm0 0L19.5 7.125" />
+          </svg>
+        </button>
+        <button class="icon-btn delete btn-delete" title="削除">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+          </svg>
+        </button>
+      </div>
+    `;
+
+    // Bind item click actions
+    card.querySelector('.btn-edit').addEventListener('click', (e) => {
+      e.stopPropagation();
+      openModal(r);
+    });
+
+    card.querySelector('.btn-delete').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (confirm('この記録を削除してもよろしいですか？')) {
+        const deleted = BPStorage.delete(r.id);
+        if (deleted) {
+          showToast('記録を削除しました');
+          refreshViewData();
+        }
+      }
+    });
+
+    return card;
+  };
+
+  // --- Dynamic Dashboard Graph Filter Attachments ---
+  const dashFilterBtns = document.querySelectorAll('#view-dashboard .graph-filter-btn');
+  dashFilterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      dashFilterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeDashDays = Number(btn.getAttribute('data-days'));
+      refreshViewData();
+    });
+  });
+
+  // --- Dynamic Analytics Filter Attachments ---
+  const analyticsTypeBtns = document.querySelectorAll('#analytics-type-filter .graph-filter-btn');
+  analyticsTypeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      analyticsTypeBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeAnalyticsType = btn.getAttribute('data-type');
+      refreshViewData();
+    });
+  });
+
+  const analyticsDaysBtns = document.querySelectorAll('#analytics-days-filter .graph-filter-btn');
+  analyticsDaysBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      analyticsDaysBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeAnalyticsDays = Number(btn.getAttribute('data-days'));
+      refreshViewData();
+    });
+  });
+
+  // --- Settings Tab Actions ---
+  
+  // CSV Export
+  settingsExportBtn.addEventListener('click', () => {
+    try {
+      const csvContent = BPStorage.exportToCSV();
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' }); // UTF-8 with BOM for Excel compatibility
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      
+      const d = new Date();
+      const dateStr = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+      link.setAttribute('download', `血圧手帳_${dateStr}.csv`);
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      showToast('CSVファイルを書き出しました');
+    } catch (e) {
+      console.error(e);
+      showToast('CSV出力に失敗しました', false);
+    }
+  });
+
+  // CSV Import
+  settingsImportInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target.result;
+      const res = BPStorage.importFromCSV(text);
+
+      if (res.success) {
+        showToast(`${res.count}件の新規データを取り込みました。`);
+        refreshViewData();
+      } else {
+        showToast(`インポート失敗: ${res.error}`, false);
+      }
+      
+      // Reset input value to allow importing same file again
+      settingsImportInput.value = '';
+    };
+    
+    reader.readAsText(file);
+  });
+
+  // Generate Sample Data
+  settingsSeedBtn.addEventListener('click', () => {
+    if (confirm('既存データを削除し、2週間分のデモデータを再生成しますか？')) {
+      localStorage.removeItem(BPStorage.STORAGE_KEY);
+      BPStorage.seedMockupData();
+      showToast('デモデータを生成しました');
+      
+      // Force switch to dashboard and refresh
+      switchView('dashboard');
+    }
+  });
+
+  // Delete All Data
+  settingsDeleteAllBtn.addEventListener('click', () => {
+    if (confirm('【注意】すべての記録が削除され、元に戻せません。本当に削除しますか？')) {
+      localStorage.removeItem(BPStorage.STORAGE_KEY);
+      showToast('すべてのデータを削除しました');
+      refreshViewData();
+    }
+  });
+
+  // --- Wallpaper Settings Actions ---
+  
+  const applyWallpaper = (wpData) => {
+    const body = document.body;
+    
+    // Reset state
+    body.classList.remove('has-custom-bg');
+    body.style.background = '';
+    body.style.backgroundImage = '';
+    
+    if (wpData.type === 'preset' && wpData.value !== 'default') {
+      const presets = {
+        sakura: 'linear-gradient(135deg, #fbcfe8 0%, #f472b6 100%)',
+        ocean: 'linear-gradient(135deg, #a5f3fc 0%, #0891b2 100%)',
+        sunset: 'linear-gradient(135deg, #ffedd5 0%, #ea580c 100%)',
+        forest: 'linear-gradient(135deg, #a7f3d0 0%, #059669 100%)'
+      };
+      body.style.background = presets[wpData.value] || '';
+      btnResetWallpaper.style.display = 'block';
+      updatePresetActiveState(wpData.value);
+    } else if (wpData.type === 'image') {
+      body.style.backgroundImage = `url("${wpData.value}")`;
+      body.classList.add('has-custom-bg');
+      btnResetWallpaper.style.display = 'block';
+      updatePresetActiveState('custom');
+    } else {
+      // Default
+      btnResetWallpaper.style.display = 'none';
+      updatePresetActiveState('default');
+    }
+  };
+
+  const updatePresetActiveState = (activeTheme) => {
+    wallpaperPresets.forEach(btn => {
+      const theme = btn.getAttribute('data-theme');
+      if (theme === activeTheme) {
+        btn.classList.add('active');
+        btn.style.border = '2px solid var(--primary)';
+      } else {
+        btn.classList.remove('active');
+        btn.style.border = '2px solid transparent';
+      }
+    });
+  };
+
+  const loadWallpaper = () => {
+    const wp = localStorage.getItem('blood_pressure_diary_wallpaper');
+    if (!wp) return;
+    try {
+      const wpData = JSON.parse(wp);
+      applyWallpaper(wpData);
+    } catch (e) {
+      console.error('Failed to parse wallpaper from localStorage', e);
+    }
+  };
+
+  // Preset Buttons Click
+  wallpaperPresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const theme = btn.getAttribute('data-theme');
+      const wpData = { type: 'preset', value: theme };
+      localStorage.setItem('blood_pressure_diary_wallpaper', JSON.stringify(wpData));
+      applyWallpaper(wpData);
+      showToast('カラーテーマを変更しました');
+    });
+  });
+
+  // Custom Image Upload Trigger
+  btnUploadWallpaper.addEventListener('click', () => {
+    wallpaperFileInput.click();
+  });
+
+  // File Input Changed
+  wallpaperFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Limit to 1.5MB to prevent localStorage quota error
+    if (file.size > 1.5 * 1024 * 1024) {
+      showToast('画像サイズが大きすぎます (1.5MB以下にしてください)', false);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const base64 = evt.target.result;
+      const wpData = { type: 'image', value: base64 };
+      try {
+        localStorage.setItem('blood_pressure_diary_wallpaper', JSON.stringify(wpData));
+        applyWallpaper(wpData);
+        showToast('カスタム壁紙を設定しました');
+      } catch (err) {
+        console.error(err);
+        showToast('保存に失敗しました。画像のサイズを下げてください。', false);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Reset Wallpaper
+  btnResetWallpaper.addEventListener('click', () => {
+    localStorage.removeItem('blood_pressure_diary_wallpaper');
+    applyWallpaper({ type: 'preset', value: 'default' });
+    showToast('壁紙を初期設定に戻しました');
+  });
+
+  // --- Initial Render ---
+  loadWallpaper();
+  refreshViewData();
+});

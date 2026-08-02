@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>血圧手帳 - Blood Pressure Diary</title>
+  
+  <!-- Web App Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#f5f7fa">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="血圧手帳">
+  <link rel="apple-touch-icon" href="icon.png">
+
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  
+  <!-- Simulating Smartphone Container -->
+  <div id="app-container">
+    
+    <!-- Top Header -->
+    <header>
+      <h1>
+        <!-- Heart pulse logo -->
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--primary);">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 9.5h1.5l1 2.5 1-4 1 2.5H15" style="color: white; stroke: var(--primary); stroke-width: 2.2;" />
+        </svg>
+        <span>血圧手帳</span>
+      </h1>
+      <div class="header-actions">
+        <button id="btn-quick-add-header" class="icon-btn" style="color: var(--primary);">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- App Views -->
+    <main>
+      
+      <!-- VIEW 1: Dashboard -->
+      <section id="view-dashboard" class="app-view active">
+        <!-- Summary Stats Card -->
+        <div class="summary-grid">
+          <div class="glass-panel summary-card no-press">
+            <div class="label">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg>
+              直近の平均 (朝)
+            </div>
+            <div class="value" id="dash-morning-bp">--/--<span class="unit">mmHg</span></div>
+            <div class="status" id="dash-morning-status">測定なし</div>
+          </div>
+          
+          <div class="glass-panel summary-card no-press">
+            <div class="label">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg>
+              直近の平均 (夜)
+            </div>
+            <div class="value" id="dash-evening-bp">--/--<span class="unit">mmHg</span></div>
+            <div class="status" id="dash-evening-status">測定なし</div>
+          </div>
+        </div>
+
+        <!-- Graph Card -->
+        <div class="glass-panel graph-card no-press">
+          <div class="graph-header">
+            <div class="graph-title">血圧推移グラフ</div>
+            <div class="graph-filter-container">
+              <button class="graph-filter-btn active" data-days="7">7日間</button>
+              <button class="graph-filter-btn" data-days="30">30日間</button>
+            </div>
+          </div>
+          <div class="graph-wrapper" id="dashboard-graph">
+            <!-- SVG will render here -->
+          </div>
+        </div>
+
+        <!-- Recent Records Section -->
+        <div>
+          <h2 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+            <span>最近の記録</span>
+            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;" id="dash-record-count">0件</span>
+          </h2>
+          <div class="history-list" id="dashboard-recent-list">
+            <!-- Dynamic elements -->
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: History -->
+      <section id="view-history" class="app-view">
+        <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 4px;">測定履歴</h2>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">これまでに記録した血圧データの一覧です。データの編集や削除が行えます。</p>
+        
+        <div class="history-list" id="full-history-list">
+          <!-- Dynamic history elements -->
+        </div>
+      </section>
+
+      <!-- VIEW 3: Analytics / Detail Graph -->
+      <section id="view-analytics" class="app-view">
+        <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 4px;">血圧データ分析</h2>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">朝と夜の血圧を個別に分析し、推移を可視化します。</p>
+
+        <!-- Dynamic detailed filters -->
+        <div class="glass-panel" style="padding: 16px; display: flex; flex-direction: column; gap: 16px;" class="no-press">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">表示データ</span>
+            <div class="graph-filter-container" id="analytics-type-filter">
+              <button class="graph-filter-btn active" data-type="all">すべて</button>
+              <button class="graph-filter-btn" data-type="morning">朝のみ</button>
+              <button class="graph-filter-btn" data-type="evening">夜のみ</button>
+            </div>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">集計期間</span>
+            <div class="graph-filter-container" id="analytics-days-filter">
+              <button class="graph-filter-btn active" data-days="7">7日間</button>
+              <button class="graph-filter-btn" data-days="30">30日間</button>
+            </div>
+          </div>
+
+          <div class="graph-wrapper" id="analytics-graph" style="height: 240px; margin-top: 10px;">
+            <!-- SVG detailed graph -->
+          </div>
+        </div>
+
+        <!-- Average metrics panel -->
+        <div class="glass-panel no-press" style="padding: 16px; display: flex; flex-direction: column; gap: 12px;">
+          <div style="font-size: 0.9rem; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+            選択期間中の最高・最低血圧
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">最高血圧 (SYS)</div>
+              <div style="font-size: 1.3rem; font-weight: 700; color: var(--primary);" id="stat-max-sys">-- <span style="font-size: 0.75rem; color: var(--text-muted);">mmHg</span></div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);" id="stat-min-sys">最低: -- mmHg</div>
+            </div>
+            <div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">最低血圧 (DIA)</div>
+              <div style="font-size: 1.3rem; font-weight: 700; color: var(--secondary);" id="stat-max-dia">-- <span style="font-size: 0.75rem; color: var(--text-muted);">mmHg</span></div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);" id="stat-min-dia">最低: -- mmHg</div>
+            </div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; display: flex; justify-content: space-between;" id="stat-average-pulse">
+            <span>平均脈拍数: -- bpm</span>
+            <span id="stat-record-count">測定回数: -- 回</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: Settings -->
+      <section id="view-settings" class="app-view">
+        <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 4px;">設定</h2>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">データの移行やアプリのメンテナンスを行えます。</p>
+
+        <!-- Wallpaper Settings Card -->
+        <div class="glass-panel no-press" style="padding: 16px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px;">
+          <div style="font-size: 0.95rem; font-weight: 700; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
+            背景デザインの設定
+          </div>
+          
+          <!-- Preset themes -->
+          <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">カラーテーマ</div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;" id="wallpaper-presets">
+            <button class="icon-btn preset-btn active" data-theme="default" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #0f172a, #020617); border: 2px solid var(--primary); cursor: pointer;" title="デフォルト"></button>
+            <button class="icon-btn preset-btn" data-theme="sakura" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #fbcfe8, #f472b6); border: 2px solid transparent; cursor: pointer;" title="サクラ"></button>
+            <button class="icon-btn preset-btn" data-theme="ocean" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #a5f3fc, #0891b2); border: 2px solid transparent; cursor: pointer;" title="オーシャン"></button>
+            <button class="icon-btn preset-btn" data-theme="sunset" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #ffedd5, #ea580c); border: 2px solid transparent; cursor: pointer;" title="サンセット"></button>
+            <button class="icon-btn preset-btn" data-theme="forest" style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #a7f3d0, #059669); border: 2px solid transparent; cursor: pointer;" title="フォレスト"></button>
+          </div>
+          
+          <!-- Custom image upload -->
+          <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">カスタム壁紙</div>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button type="button" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.8rem; width: auto; border-radius: 8px;" id="btn-upload-wallpaper">
+              画像から選択
+            </button>
+            <input type="file" id="wallpaper-file-input" accept="image/*" style="display: none;">
+            
+            <button type="button" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.8rem; width: auto; border-radius: 8px; display: none;" id="btn-reset-wallpaper">
+              デフォルトに戻す
+            </button>
+          </div>
+        </div>
+
+        <div class="glass-panel settings-list no-press">
+          <!-- CSV Export -->
+          <button class="settings-item btn-secondary" style="border: none; text-align: left; background: none; width: 100%; cursor: pointer;" id="settings-export-csv">
+            <div class="settings-item-info">
+              <div class="settings-item-title">CSVファイルに書き出し</div>
+              <div class="settings-item-desc">すべてのデータをCSV形式でダウンロードします。</div>
+            </div>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+          </button>
+          
+          <!-- CSV Import -->
+          <div class="settings-item" style="position: relative;">
+            <div class="settings-item-info">
+              <div class="settings-item-title">CSVファイルから読み込み</div>
+              <div class="settings-item-desc">CSVファイルから血圧データをアプリに取り込みます。</div>
+            </div>
+            <label for="csv-file-input" style="cursor: pointer; display: flex; align-items: center;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+              </svg>
+            </label>
+            <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+          </div>
+          
+          <!-- Seed mockup -->
+          <button class="settings-item" style="border: none; text-align: left; background: none; width: 100%; cursor: pointer;" id="settings-seed-mockup">
+            <div class="settings-item-info">
+              <div class="settings-item-title">デモ用データの生成</div>
+              <div class="settings-item-desc">グラフを試すためのサンプルデータを2週間分生成します。</div>
+            </div>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.666 8.577a3.003 3.003 0 0 0-2.087 1.83 5.99 5.99 0 0 1 1.423 3.93 5.98 5.98 0 0 1 3.23-5.356 3.001 3.001 0 0 0-2.566-.404Z" />
+            </svg>
+          </button>
+          
+          <!-- Delete All Data -->
+          <button class="settings-item" style="border: none; text-align: left; background: none; width: 100%; cursor: pointer; color: var(--color-danger);" id="settings-delete-all">
+            <div class="settings-item-info">
+              <div class="settings-item-title" style="color: var(--color-danger);">すべてのデータを削除</div>
+              <div class="settings-item-desc">アプリ内に保存されているすべてのデータを削除します。</div>
+            </div>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+            </svg>
+          </button>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px; font-size: 0.75rem; color: var(--text-muted);">
+          血圧手帳 v1.0.0 (サーバー不要・ローカル保存)<br>
+          © 2026 Blood Pressure Diary
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+        </svg>
+        <span>ダッシュボード</span>
+      </button>
+
+      <button class="nav-item" data-view="history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-3.75 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
+        </svg>
+        <span>履歴</span>
+      </button>
+
+      <!-- FAB Quick Add Button -->
+      <button class="nav-item fab-button" id="btn-quick-add-fab">
+        <div class="fab-icon-container">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="width: 28px; height: 28px;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </div>
+        <span style="margin-top: 18px;">記録する</span>
+      </button>
+
+      <button class="nav-item" data-view="analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
+        </svg>
+        <span>データ分析</span>
+      </button>
+
+      <button class="nav-item" data-view="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.43l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+        </svg>
+        <span>設定</span>
+      </button>
+    </nav>
+
+    <!-- Modal Form (Quick Add / Edit) -->
+    <div class="modal-overlay" id="record-modal-overlay">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-title" id="modal-form-title">血圧を記録する</div>
+          <button class="modal-close" id="btn-modal-close">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <form id="record-form">
+          <!-- Hidden ID for edit mode -->
+          <input type="hidden" id="input-record-id">
+
+          <!-- Morning/Evening Selector -->
+          <div class="form-group">
+            <label>測定タイミング</label>
+            <div class="ampm-selector">
+              <button type="button" class="ampm-btn active morning" id="btn-select-morning" data-type="morning">
+                <!-- Sun Icon -->
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
+                </svg>
+                <span>朝の測定</span>
+              </button>
+              <button type="button" class="ampm-btn evening" id="btn-select-evening" data-type="evening">
+                <!-- Moon Icon -->
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 12.852a9.75 9.75 0 0 1-10.828-10.828 7.5 7.5 0 1 0 10.828 10.828Z" />
+                </svg>
+                <span>夜の測定</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Average Calculator Section (Accordion style) -->
+          <div style="margin-bottom: 16px; border: 1px dashed var(--border-color); padding: 12px; border-radius: 12px; background: rgba(0,0,0,0.02);">
+            <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" id="btn-toggle-calc">
+              <span style="font-size: 0.8rem; font-weight: 600; color: var(--primary); display: flex; align-items: center; gap: 6px;">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75V18m-3-10.5V18m-3-3V18m3-12h.008v.008H12V6Zm0 6h.008v.008H12V12Zm0 6h.008v.008H12V18Zm-6-6h.008v.008H6V12Zm12 0h.008v.008H18V12Z" /></svg>
+                複数回測定の平均値を計算
+              </span>
+              <span style="font-size: 0.75rem; color: var(--text-muted);" id="calc-toggle-icon">▼</span>
+            </div>
+            
+            <div id="calc-fields" style="display: none; flex-direction: column; gap: 10px; margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 10px;">
+              <!-- 1st measure -->
+              <div style="display: grid; grid-template-columns: 50px 1fr 1fr 1fr; gap: 8px; align-items: center;">
+                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">1回目</span>
+                <input type="number" id="calc-sys-1" class="form-control" style="padding: 6px 8px; font-size: 0.85rem;" placeholder="最高" min="40" max="250">
+                <input type="number" id="calc-dia-1" class="form-control" style="padding: 6px 8px; font-size: 0.85rem;" placeholder="最低" min="30" max="180">
+                <input type="number" id="calc-pulse-1" class="form-control" style="padding: 6px 8px; font-size: 0.85rem;" placeholder="脈拍" min="30" max="220">
+              </div>
+              <!-- 2nd measure -->
+              <div style="display: grid; grid-template-columns: 50px 1fr 1fr 1fr; gap: 8px; align-items: center;">
+                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">2回目</span>
+                <input type="number" id="calc-sys-2" class="form-control" style="padding: 6px 8px; font-size: 0.85rem;" placeholder="最高" min="40" max="250">
+                <input type="number" id="calc-dia-2" class="form-control" style="padding: 6px 8px; font-size: 0.85rem;" placeholder="最低" min="30" max="180">
+                <input type="number" id="calc-pulse-2" class="form-control" style="padding: 6px 8px; font-size: 0.85rem;" placeholder="脈拍" min="30" max="220">
+              </div>
+              <!-- 3rd measure -->
+              <div style="display: grid; grid-template-columns: 50px 1fr 1fr 1fr; gap: 8px; align-items: center;">
+                <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">3回目</span>
+                <input type="number" id="calc-sys-3" class="form-control" style="padding: 6px 8px; font-size: 0.85rem;" placeholder="最高" min="40" max="250">
+                <input type="number" id="calc-dia-3" class="form-control" style="padding: 6px 8px; font-size: 0.85rem;" placeholder="最低" min="30" max="180">
+                <input type="number" id="calc-pulse-3" class="form-control" style="padding: 6px 8px; font-size: 0.85rem;" placeholder="脈拍" min="30" max="220">
+              </div>
+              
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: var(--text-muted); gap: 10px;">
+                <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
+                  <input type="checkbox" id="calc-auto-notes" checked style="cursor: pointer;"> 各測定値をメモに自動記録
+                </label>
+                <button type="button" id="btn-clear-calc" class="btn btn-secondary" style="padding: 4px 10px; width: auto; font-size: 0.75rem; border-radius: 6px;">クリア</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- SYS & DIA Inputs -->
+          <div class="input-row">
+            <div class="form-group">
+              <label for="input-sys">最高血圧 (上)</label>
+              <input type="number" id="input-sys" class="form-control" placeholder="120" min="40" max="250" required pattern="\d*">
+            </div>
+            <div class="form-group">
+              <label for="input-dia">最低血圧 (下)</label>
+              <input type="number" id="input-dia" class="form-control" placeholder="78" min="30" max="180" required pattern="\d*">
+            </div>
+          </div>
+
+          <!-- Pulse & Datetime -->
+          <div class="input-row">
+            <div class="form-group">
+              <label for="input-pulse">脈拍 (拍/分)</label>
+              <input type="number" id="input-pulse" class="form-control" placeholder="70" min="30" max="220" required pattern="\d*">
+            </div>
+            <div class="form-group">
+              <label for="input-datetime">測定日時</label>
+              <input type="datetime-local" id="input-datetime" class="form-control" required>
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div class="form-group">
+            <label for="input-notes">メモ (体調など)</label>
+            <input type="text" id="input-notes" class="form-control" placeholder="例: 薬の服用後、少し肩こりなど">
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="btn btn-primary" style="margin-top: 10px;" id="btn-submit-form">
+            <span>記録を保存</span>
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast-message">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--color-success);" id="toast-icon">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+      </svg>
+      <span id="toast-text">保存しました</span>
+    </div>
+
+  </div>
+
+  <!-- App scripts -->
+  <script src="js/storage.js"></script>
+  <script src="js/graph.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
