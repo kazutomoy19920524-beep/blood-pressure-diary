@@ -1,6 +1,7 @@
 /**
  * Storage Class for Blood Pressure Diary
- * Handles CRUD operations, statistics calculation, BP classification, and CSV import/export.
+ * Handles CRUD operations, statistics calculation, BP classification, CSV import/export,
+ * and background IndexedDB backup for data loss prevention.
  */
 class BPStorage {
   static STORAGE_KEY = 'blood_pressure_diary_records';
@@ -52,6 +53,10 @@ class BPStorage {
     }
 
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(records));
+    
+    // Trigger background backup
+    this.backupToIndexedDB();
+    
     return record;
   }
 
@@ -67,6 +72,10 @@ class BPStorage {
     if (records.length === filtered.length) return false;
     
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(filtered));
+    
+    // Trigger background backup
+    this.backupToIndexedDB();
+    
     return true;
   }
 
@@ -236,7 +245,6 @@ class BPStorage {
 
       const importedRecords = [];
       const existingRecords = this.getAll();
-      const existingIds = new Set(existingRecords.map(r => r.id));
 
       // Skip header
       for (let i = 1; i < lines.length; i++) {
@@ -280,6 +288,10 @@ class BPStorage {
       });
 
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(mergedRecords));
+      
+      // Trigger background backup
+      this.backupToIndexedDB();
+      
       return { success: true, count: addCount, total: mergedRecords.length };
     } catch (e) {
       console.error('CSV import failed:', e);
@@ -287,58 +299,104 @@ class BPStorage {
     }
   }
 
+  // --- IndexedDB Auto Backup & Restore Logic ---
+
   /**
-   * Helper to seed initial mockup data for rich experience on first open
+   * Helper to open IndexedDB connection
+   * @returns {Promise<IDBDatabase>}
    */
-  static seedMockupData() {
-    const records = this.getAll();
-    if (records.length > 0) return; // Don't overwrite existing user data
+  static getIndexedDBConnection() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('BloodPressureDiaryDB', 1);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('backup')) {
+          db.createObjectStore('backup', { keyPath: 'id' });
+        }
+      };
+    });
+  }
 
-    const mockup = [];
-    const now = new Date();
-    
-    // Seed 14 days of data (both morning and evening)
-    for (let i = 13; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(now.getDate() - i);
+  /**
+   * Background Mirroring: Copy LocalStorage data to IndexedDB
+   */
+  static async backupToIndexedDB() {
+    try {
+      const records = this.getAll();
+      const db = await this.getIndexedDBConnection();
+      const transaction = db.transaction('backup', 'readwrite');
+      const store = transaction.objectStore('backup');
       
-      // Morning record (usually lower pulse, slightly higher BP on waking sometimes)
-      const morningDate = new Date(date);
-      morningDate.setHours(7, Math.floor(Math.random() * 60), 0);
-      
-      // Simulate blood pressure pattern (with slight random variation)
-      // Normal BP ranges but with occasional high/elevated readings
-      const baseSys = 120 + Math.round((Math.sin(i / 2) * 8)) + Math.round((Math.random() * 8) - 4);
-      const baseDia = 78 + Math.round((Math.sin(i / 2) * 5)) + Math.round((Math.random() * 6) - 3);
-      
-      mockup.push({
-        id: `mock_m_${i}`,
-        timestamp: morningDate.toISOString(),
-        type: 'morning',
-        sys: baseSys,
-        dia: baseDia,
-        pulse: 60 + Math.floor(Math.random() * 15),
-        notes: i === 5 ? '少し頭痛あり' : i === 10 ? '寝不足ぎみ' : ''
-      });
+      // Clear old backup and insert current records
+      const clearRequest = store.clear();
+      clearRequest.onsuccess = () => {
+        records.forEach(r => {
+          store.put(r);
+        });
+        console.log('[Backup] IndexedDB backup updated successfully. Count:', records.length);
+      };
 
-      // Evening record
-      const eveningDate = new Date(date);
-      eveningDate.setHours(21, Math.floor(Math.random() * 60), 0);
-      
-      const eveSys = baseSys - 4 + Math.round((Math.random() * 8) - 4);
-      const eveDia = baseDia - 3 + Math.round((Math.random() * 6) - 3);
-
-      mockup.push({
-        id: `mock_e_${i}`,
-        timestamp: eveningDate.toISOString(),
-        type: 'evening',
-        sys: eveSys,
-        dia: eveDia,
-        pulse: 65 + Math.floor(Math.random() * 15),
-        notes: ''
-      });
+      // Request storage persistence from OS (keeps data indefinitely)
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().then(persisted => {
+          if (persisted) {
+            console.log('[Storage] Persistent storage granted by OS.');
+          }
+        });
+      }
+    } catch (e) {
+      console.error('[Backup] Failed to backup to IndexedDB:', e);
     }
+  }
 
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(mockup));
+  /**
+   * Auto Recovery: Restore LocalStorage from IndexedDB if LocalStorage is empty
+   * @returns {Promise<Boolean>} True if data was recovered, False otherwise
+   */
+  static async restoreFromBackup() {
+    try {
+      const existing = this.getAll();
+      // If we already have data in LocalStorage, don't restore anything
+      if (existing.length > 0) return false;
+
+      const db = await this.getIndexedDBConnection();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction('backup', 'readonly');
+        const store = transaction.objectStore('backup');
+        const request = store.getAll();
+        
+        request.onsuccess = () => {
+          const records = request.result;
+          if (records && records.length > 0) {
+            localStorage.setItem(this.STORAGE_KEY, JSON.stringify(records));
+            console.log('[Restore] Recovered records from IndexedDB backup. Count:', records.length);
+            resolve(true);
+          } else {
+            resolve(false);
+          }
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn('[Restore] Failed to restore from IndexedDB:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Helper to completely clear IndexedDB backup (for factory reset)
+   */
+  static async clearIndexedDBBackup() {
+    try {
+      const db = await this.getIndexedDBConnection();
+      const transaction = db.transaction('backup', 'readwrite');
+      const store = transaction.objectStore('backup');
+      store.clear();
+      console.log('[Backup] IndexedDB backup cleared.');
+    } catch (e) {
+      console.error('[Backup] Failed to clear IndexedDB backup:', e);
+    }
   }
 }

@@ -50,6 +50,17 @@
       
       <!-- VIEW 1: Dashboard -->
       <section id="view-dashboard" class="app-view active">
+        <!-- PWA Install Banner -->
+        <div id="pwa-install-banner" class="install-banner" style="display: none;">
+          <div class="install-banner-text">
+            <strong>血圧手帳アプリ</strong><br>
+            ホーム画面に追加して便利に使えます
+          </div>
+          <button type="button" class="btn btn-primary" id="btn-pwa-install" style="width: auto; padding: 6px 12px; font-size: 0.75rem; border-radius: 8px; margin: 0;">
+            インストール
+          </button>
+        </div>
+
         <!-- Summary Stats Card -->
         <div class="summary-grid">
           <div class="glass-panel summary-card no-press">
@@ -76,8 +87,9 @@
           <div class="graph-header">
             <div class="graph-title">血圧推移グラフ</div>
             <div class="graph-filter-container">
-              <button class="graph-filter-btn active" data-days="7">7日間</button>
-              <button class="graph-filter-btn" data-days="30">30日間</button>
+              <button class="graph-filter-btn active" data-days="30">30日間</button>
+              <button class="graph-filter-btn" data-days="60">60日間</button>
+              <button class="graph-filter-btn" data-days="90">90日間</button>
             </div>
           </div>
           <div class="graph-wrapper" id="dashboard-graph">
@@ -100,10 +112,55 @@
       <!-- VIEW 2: History -->
       <section id="view-history" class="app-view">
         <h2 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 4px;">測定履歴</h2>
-        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">これまでに記録した血圧データの一覧です。データの編集や削除が行えます。</p>
         
-        <div class="history-list" id="full-history-list">
-          <!-- Dynamic history elements -->
+        <!-- Toggle view mode (List or Calendar) -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0; max-width: 60%;">記録データの一覧およびカレンダー表示です。</p>
+          <div class="graph-filter-container" id="history-view-mode-filter">
+            <button class="graph-filter-btn" id="btn-history-list-mode" data-mode="list">リスト</button>
+            <button class="graph-filter-btn active" id="btn-history-calendar-mode" data-mode="calendar">カレンダー</button>
+          </div>
+        </div>
+
+        <!-- 2a. List View Container -->
+        <div id="history-list-container" style="display: none;">
+          <div class="history-list" id="full-history-list">
+            <!-- Dynamic history elements -->
+          </div>
+        </div>
+
+        <!-- 2b. Calendar View Container -->
+        <div id="history-calendar-container" class="calendar-view-container">
+          <div class="calendar-header-nav">
+            <button class="icon-btn" id="btn-calendar-prev" style="padding: 4px;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+            </button>
+            <h3 id="calendar-current-month" style="margin: 0;">2026年08月</h3>
+            <button class="icon-btn" id="btn-calendar-next" style="padding: 4px;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+            </button>
+          </div>
+
+          <div class="calendar-grid-header">
+            <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
+          </div>
+
+          <div class="calendar-grid" id="calendar-grid-body">
+            <!-- Render calendar cells dynamically -->
+          </div>
+
+          <!-- Selected Day Detail View -->
+          <div class="calendar-day-detail-panel" id="calendar-day-detail-panel" style="display: none;">
+            <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; color: var(--text-main); margin-top: 0;">
+              <span id="calendar-selected-date-label">8月23日の記録</span>
+              <button class="btn btn-secondary" id="btn-calendar-add-record" style="width: auto; padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; margin: 0;">
+                この日を記録
+              </button>
+            </h3>
+            <div class="history-list" id="calendar-day-records-list">
+              <!-- Selected day records will render here -->
+            </div>
+          </div>
         </div>
       </section>
 
@@ -126,8 +183,9 @@
           <div style="display: flex; justify-content: space-between; align-items: center;">
             <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">集計期間</span>
             <div class="graph-filter-container" id="analytics-days-filter">
-              <button class="graph-filter-btn active" data-days="7">7日間</button>
-              <button class="graph-filter-btn" data-days="30">30日間</button>
+              <button class="graph-filter-btn active" data-days="30">30日間</button>
+              <button class="graph-filter-btn" data-days="60">60日間</button>
+              <button class="graph-filter-btn" data-days="90">90日間</button>
             </div>
           </div>
 
@@ -197,6 +255,17 @@
         </div>
 
         <div class="glass-panel settings-list no-press">
+          <!-- PDF Report Print -->
+          <button class="settings-item" style="border: none; text-align: left; background: none; width: 100%; cursor: pointer;" id="settings-print-report">
+            <div class="settings-item-info">
+              <div class="settings-item-title">レポートを印刷・PDF保存</div>
+              <div class="settings-item-desc">医師への提示に適したA4サイズの血圧レポートを出力します。</div>
+            </div>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.617 0-1.11-.483-1.12-1.101L6.34 18M17.66 18H6.34m12.44-6.364c.29-.19.531-.44.708-.73a1.71 1.71 0 0 0 .194-.962V9c0-1.028-.774-1.9-1.8-1.979A42.93 42.93 0 0 0 12 6.75c-1.92 0-3.793.125-5.632.371C5.342 7.2 4.568 8.072 4.568 9v1.309c0 .343.067.68.194.962.178.29.42.54.708.73m13.064 0a41.08 41.08 0 0 1-13.064 0m13.064 0c-.24.03-.48.062-.72.096m-11.624-1.28c.376-.04.755-.075 1.137-.104m7.35-.152c-.376-.04-.755-.075-1.137-.104m-5.076 15.03c.376-.04.755-.075 1.137-.104" />
+            </svg>
+          </button>
+
           <!-- CSV Export -->
           <button class="settings-item btn-secondary" style="border: none; text-align: left; background: none; width: 100%; cursor: pointer;" id="settings-export-csv">
             <div class="settings-item-info">
@@ -221,18 +290,6 @@
             </label>
             <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
           </div>
-          
-          <!-- Seed mockup -->
-          <button class="settings-item" style="border: none; text-align: left; background: none; width: 100%; cursor: pointer;" id="settings-seed-mockup">
-            <div class="settings-item-info">
-              <div class="settings-item-title">デモ用データの生成</div>
-              <div class="settings-item-desc">グラフを試すためのサンプルデータを2週間分生成します。</div>
-            </div>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 18a3.75 3.75 0 0 0 .495-7.467 5.99 5.99 0 0 0-1.925 3.546 5.974 5.974 0 0 1-2.133-1A3.75 3.75 0 0 0 12 18Z" />
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.666 8.577a3.003 3.003 0 0 0-2.087 1.83 5.99 5.99 0 0 1 1.423 3.93 5.98 5.98 0 0 1 3.23-5.356 3.001 3.001 0 0 0-2.566-.404Z" />
-            </svg>
-          </button>
           
           <!-- Delete All Data -->
           <button class="settings-item" style="border: none; text-align: left; background: none; width: 100%; cursor: pointer; color: var(--color-danger);" id="settings-delete-all">

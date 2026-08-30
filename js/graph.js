@@ -136,8 +136,16 @@ class BPGraph {
     }
 
     // --- 3. X Axis Labels ---
-    // Label step: if 30 days, label every 5 days. For 7 days, label every day.
-    const labelStep = days === 30 ? 5 : 1;
+    // Label step adjusted based on date range to prevent label overlap
+    let labelStep = 1;
+    if (days >= 90) {
+      labelStep = 15;
+    } else if (days >= 60) {
+      labelStep = 10;
+    } else if (days >= 30) {
+      labelStep = 5;
+    }
+    
     dateKeys.forEach((key, idx) => {
       if (idx % labelStep === 0) {
         const xPos = getX(idx, 'morning'); // centered

@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>PayloadContent</key>
+    <array>
+        <dict>
+            <key>URL</key>
+            <string>https://kazutomoy19920524-beep.github.io/blood-pressure-diary/</string>
+            <key>Label</key>
+            <string>血圧日記</string>
+            <key>IsRemovable</key>
+            <true/>
+            <key>PayloadDescription</key>
+            <string>ウェブアプリ「血圧日記」へのショートカットを設定します。</string>
+            <key>PayloadDisplayName</key>
+            <string>血圧日記</string>
+            <key>PayloadIdentifier</key>
+            <string>com.bloodpressure.app.webclip</string>
+            <key>PayloadType</key>
+            <string>com.apple.webClip.managed</string>
+            <key>PayloadUUID</key>
+            <string>6A2DE2FD-00FF-4B41-89FA-F070EDA9327A</string>
+            <key>PayloadVersion</key>
+            <integer>1</integer>
+        </dict>
+    </array>
+    <key>PayloadDisplayName</key>
+    <string>血圧日記 インストーラー</string>
+    <key>PayloadIdentifier</key>
+    <string>com.bloodpressure.app.profile</string>
+    <key>PayloadRemovalDisallowed</key>
+    <false/>
+    <key>PayloadType</key>
+    <string>Configuration</string>
+    <key>PayloadUUID</key>
+    <string>D3475DE8-7C05-4E5B-9574-92F479FA68E4</string>
+    <key>PayloadVersion</key>
+    <integer>1</integer>
+</dict>
+</plist>

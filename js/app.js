@@ -12,10 +12,7 @@ if ('serviceWorker' in navigator) {
  */
 document.addEventListener('DOMContentLoaded', () => {
   // --- Initialize App State ---
-  // Seed mockup data on first open if empty
-  if (BPStorage.getAll().length === 0) {
-    BPStorage.seedMockupData();
-  }
+  // Seed backup recovery will run asynchronously, wait for it in load workflow.
 
   // --- UI Elements ---
   const views = {
@@ -52,8 +49,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const dashRecentList = document.getElementById('dashboard-recent-list');
   const dashGraphWrapper = document.getElementById('dashboard-graph');
 
-  // History elements
+  // History / Calendar elements
+  const historyViewModeFilter = document.getElementById('history-view-mode-filter');
+  const btnHistoryListMode = document.getElementById('btn-history-list-mode');
+  const btnHistoryCalendarMode = document.getElementById('btn-history-calendar-mode');
+  const historyListContainer = document.getElementById('history-list-container');
+  const historyCalendarContainer = document.getElementById('history-calendar-container');
   const fullHistoryList = document.getElementById('full-history-list');
+  
+  const btnCalendarPrev = document.getElementById('btn-calendar-prev');
+  const btnCalendarNext = document.getElementById('btn-calendar-next');
+  const calendarCurrentMonth = document.getElementById('calendar-current-month');
+  const calendarGridBody = document.getElementById('calendar-grid-body');
+  const calendarDayDetailPanel = document.getElementById('calendar-day-detail-panel');
+  const calendarSelectedDateLabel = document.getElementById('calendar-selected-date-label');
+  const btnCalendarAddRecord = document.getElementById('btn-calendar-add-record');
+  const calendarDayRecordsList = document.getElementById('calendar-day-records-list');
 
   // Analytics elements
   const analyticsGraphWrapper = document.getElementById('analytics-graph');
@@ -65,9 +76,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const statRecordCount = document.getElementById('stat-record-count');
 
   // Settings elements
+  const settingsPrintReportBtn = document.getElementById('settings-print-report');
   const settingsExportBtn = document.getElementById('settings-export-csv');
   const settingsImportInput = document.getElementById('csv-file-input');
-  const settingsSeedBtn = document.getElementById('settings-seed-mockup');
   const settingsDeleteAllBtn = document.getElementById('settings-delete-all');
 
   // Wallpaper elements
@@ -94,12 +105,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const toastText = document.getElementById('toast-text');
   const toastIcon = document.getElementById('toast-icon');
 
-  // Keep track of current timing type ('morning' or 'evening')
+  // PWA elements
+  const pwaInstallBanner = document.getElementById('pwa-install-banner');
+  const btnPwaInstall = document.getElementById('btn-pwa-install');
+  let deferredPrompt = null;
+
+  // App State Variables
   let selectedTiming = 'morning';
   let currentActiveView = 'dashboard';
-  let activeDashDays = 7;
-  let activeAnalyticsDays = 7;
+  let currentHistoryMode = 'calendar'; // Default to calendar view
+  let activeDashDays = 30; // Changed default from 7 to 30
+  let activeAnalyticsDays = 30; // Changed default from 7 to 30
   let activeAnalyticsType = 'all';
+
+  // Calendar State Variables
+  let currentCalendarYear = new Date().getFullYear();
+  let currentCalendarMonth = new Date().getMonth(); // 0-11
+  let selectedCalendarDateStr = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
 
   // --- Average Calculator Logic ---
   // Toggle Calculator Accordion
@@ -338,7 +360,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (currentActiveView === 'dashboard') {
       renderDashboard(allRecords);
     } else if (currentActiveView === 'history') {
-      renderHistoryList(allRecords);
+      if (currentHistoryMode === 'list') {
+        historyListContainer.style.display = 'block';
+        historyCalendarContainer.style.display = 'none';
+        renderHistoryList(allRecords);
+      } else {
+        historyListContainer.style.display = 'none';
+        historyCalendarContainer.style.display = 'block';
+        renderCalendar(currentCalendarYear, currentCalendarMonth, allRecords);
+      }
     } else if (currentActiveView === 'analytics') {
       renderAnalytics(allRecords);
     }
@@ -420,6 +450,161 @@ document.addEventListener('DOMContentLoaded', () => {
     records.forEach(r => {
       fullHistoryList.appendChild(createHistoryCard(r));
     });
+  };
+
+  /**
+   * Render Calendar Grid
+   */
+  const renderCalendar = (year, month, records) => {
+    // Set text month label
+    calendarCurrentMonth.textContent = `${year}年${String(month + 1).padStart(2, '0')}月`;
+
+    // Clear grid body
+    calendarGridBody.innerHTML = '';
+
+    // First day of the month
+    const firstDay = new Date(year, month, 1).getDay(); // 0 (Sun) - 6 (Sat)
+    // Days in current month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // Days in previous month
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    // Group records by local date key 'YYYY-MM-DD'
+    const recordsByDate = {};
+    records.forEach(r => {
+      const localDateStr = new Date(r.timestamp).toLocaleDateString('sv'); // 'YYYY-MM-DD' Svenska locale is YYYY-MM-DD
+      if (!recordsByDate[localDateStr]) {
+        recordsByDate[localDateStr] = [];
+      }
+      recordsByDate[localDateStr].push(r);
+    });
+
+    const todayStr = new Date().toLocaleDateString('sv');
+
+    // Render cells
+    // 1. Previous month trailing days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const d = daysInPrevMonth - i;
+      const prevMonth = month === 0 ? 11 : month - 1;
+      const prevYear = month === 0 ? year - 1 : year;
+      const dateStr = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      
+      const cell = createCalendarCell(d, dateStr, true, recordsByDate[dateStr], todayStr);
+      calendarGridBody.appendChild(cell);
+    }
+
+    // 2. Current month days
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      
+      const cell = createCalendarCell(d, dateStr, false, recordsByDate[dateStr], todayStr);
+      calendarGridBody.appendChild(cell);
+    }
+
+    // 3. Next month leading days (to fill grid properly)
+    const totalCellsRendered = firstDay + daysInMonth;
+    const nextMonthCells = (totalCellsRendered % 7 === 0) ? 0 : 7 - (totalCellsRendered % 7);
+    for (let d = 1; d <= nextMonthCells; d++) {
+      const nextMonth = month === 11 ? 0 : month + 1;
+      const nextYear = month === 11 ? year + 1 : year;
+      const dateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      
+      const cell = createCalendarCell(d, dateStr, true, recordsByDate[dateStr], todayStr);
+      calendarGridBody.appendChild(cell);
+    }
+
+    // Refresh detail panel for currently selected date
+    if (selectedCalendarDateStr) {
+      selectCalendarDay(selectedCalendarDateStr, records);
+    }
+  };
+
+  /**
+   * Helper to create a single calendar cell DOM element
+   */
+  const createCalendarCell = (dayNum, dateStr, isOtherMonth, dayRecords, todayStr) => {
+    const cell = document.createElement('div');
+    cell.className = 'calendar-cell';
+    if (isOtherMonth) cell.classList.add('other-month');
+    if (dateStr === todayStr) cell.classList.add('today');
+    if (dateStr === selectedCalendarDateStr) {
+      cell.style.borderColor = 'var(--primary)';
+      cell.style.boxShadow = '0 0 8px var(--primary-glow)';
+    }
+
+    cell.innerHTML = `
+      <span class="cell-number">${dayNum}</span>
+      <div class="cell-badges"></div>
+    `;
+
+    const badgesContainer = cell.querySelector('.cell-badges');
+    if (dayRecords && dayRecords.length > 0) {
+      const hasMorning = dayRecords.some(r => r.type === 'morning');
+      const hasEvening = dayRecords.some(r => r.type === 'evening');
+
+      if (hasMorning) {
+        const morningBadge = document.createElement('div');
+        morningBadge.className = 'badge-indicator badge-morning';
+        morningBadge.title = '朝の測定あり';
+        badgesContainer.appendChild(morningBadge);
+      }
+      if (hasEvening) {
+        const eveningBadge = document.createElement('div');
+        eveningBadge.className = 'badge-indicator badge-evening';
+        eveningBadge.title = '夜の測定あり';
+        badgesContainer.appendChild(eveningBadge);
+      }
+    }
+
+    cell.addEventListener('click', () => {
+      selectedCalendarDateStr = dateStr;
+      
+      // Update highlights
+      document.querySelectorAll('.calendar-cell').forEach(c => {
+        c.style.borderColor = '';
+        c.style.boxShadow = '';
+      });
+      cell.style.borderColor = 'var(--primary)';
+      cell.style.boxShadow = '0 0 8px var(--primary-glow)';
+
+      const allRecords = BPStorage.getAll();
+      selectCalendarDay(dateStr, allRecords);
+    });
+
+    return cell;
+  };
+
+  /**
+   * Selection handler for a calendar date, rendering its detail panel
+   */
+  const selectCalendarDay = (dateStr, records) => {
+    const dayRecords = records.filter(r => new Date(r.timestamp).toLocaleDateString('sv') === dateStr);
+    
+    // Format date string
+    const d = new Date(dateStr + 'T00:00:00');
+    calendarSelectedDateLabel.textContent = `${d.getMonth() + 1}月${d.getDate()}日の記録`;
+    
+    calendarDayRecordsList.innerHTML = '';
+    
+    if (dayRecords.length === 0) {
+      calendarDayRecordsList.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; padding: 16px 0;">
+          この日の記録はありません。
+        </div>
+      `;
+    } else {
+      // Sort Morning then Evening
+      dayRecords.sort((a, b) => {
+        if (a.type === 'morning' && b.type === 'evening') return -1;
+        if (a.type === 'evening' && b.type === 'morning') return 1;
+        return new Date(a.timestamp) - new Date(b.timestamp);
+      });
+      dayRecords.forEach(r => {
+        calendarDayRecordsList.appendChild(createHistoryCard(r));
+      });
+    }
+
+    calendarDayDetailPanel.style.display = 'block';
   };
 
   /**
@@ -553,6 +738,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Settings Tab Actions ---
   
+  // PDF Report Print (A4 A4-friendly printer and PDF generation)
+  settingsPrintReportBtn.addEventListener('click', () => {
+    printReport();
+  });
+
   // CSV Export
   settingsExportBtn.addEventListener('click', () => {
     try {
@@ -602,25 +792,202 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.readAsText(file);
   });
 
-  // Generate Sample Data
-  settingsSeedBtn.addEventListener('click', () => {
-    if (confirm('既存データを削除し、2週間分のデモデータを再生成しますか？')) {
-      localStorage.removeItem(BPStorage.STORAGE_KEY);
-      BPStorage.seedMockupData();
-      showToast('デモデータを生成しました');
-      
-      // Force switch to dashboard and refresh
-      switchView('dashboard');
-    }
-  });
-
   // Delete All Data
   settingsDeleteAllBtn.addEventListener('click', () => {
-    if (confirm('【注意】すべての記録が削除され、元に戻せません。本当に削除しますか？')) {
+    if (confirm('【注意】すべての記録が削除され、元に戻せません。本当に削除しますか？\n(IndexedDBバックアップからも削除されます)')) {
       localStorage.removeItem(BPStorage.STORAGE_KEY);
+      BPStorage.clearIndexedDBBackup();
       showToast('すべてのデータを削除しました');
       refreshViewData();
     }
+  });
+
+  // --- PDF Report Generator Logic ---
+  const printReport = () => {
+    const allRecords = BPStorage.getAll();
+    if (allRecords.length === 0) {
+      showToast('印刷するデータがありません', false);
+      return;
+    }
+
+    // Statistics (Last 30 days)
+    const stats = BPStorage.getStats(30);
+
+    // Group records by Japanese Locale Date string for morning/evening representation in table
+    const sorted = [...allRecords].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const rowsByDate = {};
+    sorted.forEach(r => {
+      const localDate = new Date(r.timestamp).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' });
+      if (!rowsByDate[localDate]) {
+        rowsByDate[localDate] = { morning: null, evening: null };
+      }
+      rowsByDate[localDate][r.type] = r;
+    });
+
+    let tableRowsHTML = '';
+    Object.keys(rowsByDate).forEach(dateStr => {
+      const data = rowsByDate[dateStr];
+      const m = data.morning;
+      const e = data.evening;
+
+      const mBP = m ? `${m.sys}/${m.dia}` : '-';
+      const mPulse = m ? `${m.pulse}` : '-';
+      const mNotes = m && m.notes ? m.notes : '';
+
+      const eBP = e ? `${e.sys}/${e.dia}` : '-';
+      const ePulse = e ? `${e.pulse}` : '-';
+      const eNotes = e && e.notes ? e.notes : '';
+
+      tableRowsHTML += `
+        <tr>
+          <td>${dateStr}</td>
+          <td style="color: #0891b2; font-weight: 700;">${mBP}</td>
+          <td>${mPulse}</td>
+          <td style="font-size: 8pt; color: #555;">${mNotes}</td>
+          <td style="color: #ea580c; font-weight: 700;">${eBP}</td>
+          <td>${ePulse}</td>
+          <td style="font-size: 8pt; color: #555;">${eNotes}</td>
+        </tr>
+      `;
+    });
+
+    // Clone the SVG graph from dashboard for static report rendering
+    const graphClone = dashGraphWrapper.cloneNode(true);
+    const tooltipInClone = graphClone.querySelector('#graph-tooltip');
+    if (tooltipInClone) tooltipInClone.remove();
+
+    // Create printer page element
+    const printContainer = document.createElement('div');
+    printContainer.className = 'print-report-layout';
+    printContainer.style.display = 'none';
+
+    const d = new Date();
+    const printDate = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+
+    printContainer.innerHTML = `
+      <div class="print-report-header">
+        <h1 class="print-report-title">血圧管理レポート</h1>
+        <p style="font-size: 9pt; color: #666; margin: 4px 0 0 0;">出力日: ${printDate} | 血圧手帳</p>
+      </div>
+
+      <h3 style="font-size: 11pt; margin-top: 0; border-left: 4px solid #ea580c; padding-left: 8px;">📊 直近30日間の統計</h3>
+      <table class="print-stats-table">
+        <thead>
+          <tr>
+            <th>区分</th>
+            <th>平均血圧 (最高/最低)</th>
+            <th>平均脈拍</th>
+            <th>最高血圧 (SYS)</th>
+            <th>最低血圧 (DIA)</th>
+            <th>測定回数</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>朝 (起床時)</td>
+            <td>${stats.morning.count > 0 ? `${stats.morning.avgSys}/${stats.morning.avgDia} mmHg` : '-'}</td>
+            <td>${stats.morning.count > 0 ? `${stats.morning.avgPulse} bpm` : '-'}</td>
+            <td>${stats.morning.count > 0 ? `${stats.morning.maxSys} mmHg` : '-'}</td>
+            <td>${stats.morning.count > 0 ? `${stats.morning.minDia} mmHg` : '-'}</td>
+            <td>${stats.morning.count} 回</td>
+          </tr>
+          <tr>
+            <td>夜 (就寝前)</td>
+            <td>${stats.evening.count > 0 ? `${stats.evening.avgSys}/${stats.evening.avgDia} mmHg` : '-'}</td>
+            <td>${stats.evening.count > 0 ? `${stats.evening.avgPulse} bpm` : '-'}</td>
+            <td>${stats.evening.count > 0 ? `${stats.evening.maxSys} mmHg` : '-'}</td>
+            <td>${stats.evening.count > 0 ? `${stats.evening.minDia} mmHg` : '-'}</td>
+            <td>${stats.evening.count} 回</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 style="font-size: 11pt; margin-top: 24px; border-left: 4px solid #ea580c; padding-left: 8px;">📈 直近の血圧推移</h3>
+      <div class="print-chart-container" style="background: #fafafa; border: 1px solid #eee; border-radius: 8px; padding: 10px;">
+        ${graphClone.innerHTML}
+      </div>
+
+      <div class="page-break"></div>
+
+      <h3 style="font-size: 11pt; margin-top: 0; border-left: 4px solid #ea580c; padding-left: 8px;">📋 測定データ一覧</h3>
+      <table class="print-records-table">
+        <thead>
+          <tr>
+            <th rowspan="2">日付</th>
+            <th colspan="3" style="background-color: #f0f8ff; text-align: center;">朝の測定 (起床時)</th>
+            <th colspan="3" style="background-color: #fffaf0; text-align: center;">夜の測定 (就寝前)</th>
+          </tr>
+          <tr>
+            <th style="background-color: #f0f8ff;">血圧 (mmHg)</th>
+            <th style="background-color: #f0f8ff;">脈拍 (bpm)</th>
+            <th style="background-color: #f0f8ff;">メモ</th>
+            <th style="background-color: #fffaf0;">血圧 (mmHg)</th>
+            <th style="background-color: #fffaf0;">脈拍 (bpm)</th>
+            <th style="background-color: #fffaf0;">メモ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRowsHTML}
+        </tbody>
+      </table>
+    `;
+
+    document.body.appendChild(printContainer);
+    
+    // Short defer to allow browser DOM paint EKG graph clone
+    setTimeout(() => {
+      window.print();
+      document.body.removeChild(printContainer);
+    }, 150);
+  };
+
+  // --- Calendar Navigation & Toggle Events ---
+
+  // History Mode Toggle: List vs Calendar
+  btnHistoryListMode.addEventListener('click', () => {
+    btnHistoryListMode.classList.add('active');
+    btnHistoryCalendarMode.classList.remove('active');
+    currentHistoryMode = 'list';
+    refreshViewData();
+  });
+
+  btnHistoryCalendarMode.addEventListener('click', () => {
+    btnHistoryCalendarMode.classList.add('active');
+    btnHistoryListMode.classList.remove('active');
+    currentHistoryMode = 'calendar';
+    refreshViewData();
+  });
+
+  // Calendar Prev/Next month button handlers
+  btnCalendarPrev.addEventListener('click', () => {
+    if (currentCalendarMonth === 0) {
+      currentCalendarMonth = 11;
+      currentCalendarYear -= 1;
+    } else {
+      currentCalendarMonth -= 1;
+    }
+    refreshViewData();
+  });
+
+  btnCalendarNext.addEventListener('click', () => {
+    if (currentCalendarMonth === 11) {
+      currentCalendarMonth = 0;
+      currentCalendarYear += 1;
+    } else {
+      currentCalendarMonth += 1;
+    }
+    refreshViewData();
+  });
+
+  // "Record this day" button click
+  btnCalendarAddRecord.addEventListener('click', () => {
+    openModal();
+    // Pre-fill selection date into datetime input
+    const d = new Date(selectedCalendarDateStr);
+    const now = new Date();
+    // Retain current hour/minute to make time input natural
+    d.setHours(now.getHours(), now.getMinutes());
+    inputDatetime.value = getLocalDateTimeString(d);
   });
 
   // --- Wallpaper Settings Actions ---
@@ -729,7 +1096,35 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('壁紙を初期設定に戻しました');
   });
 
-  // --- Initial Render ---
-  loadWallpaper();
-  refreshViewData();
+  // --- Android/Chrome PWA Installer prompts ---
+  window.addEventListener('beforeinstallprompt', (e) => {
+    // Prevent the mini-infobar from appearing on mobile
+    e.preventDefault();
+    // Stash the event so it can be triggered later.
+    deferredPrompt = e;
+    // Update UI notify the user they can install the PWA
+    pwaInstallBanner.style.display = 'flex';
+  });
+
+  btnPwaInstall.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`PWA Install outcome: ${outcome}`);
+    // We've used the prompt, and can't use it again
+    deferredPrompt = null;
+    // Hide the install banner
+    pwaInstallBanner.style.display = 'none';
+  });
+
+  // --- Initial Render & Auto Recovery ---
+  BPStorage.restoreFromBackup().then(recovered => {
+    if (recovered) {
+      showToast('バックアップからデータを復元しました');
+    }
+    loadWallpaper();
+    refreshViewData();
+  });
 });
