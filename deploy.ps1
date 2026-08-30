@@ -40,7 +40,7 @@ if ($repoUrl -match 'github\.com[:/]([^/]+)/([^/\.]+)') {
 }
 
 # 3. リモートの設定と Push
-git remote remove origin -ErrorAction SilentlyContinue
+git remote remove origin
 git remote add origin $repoUrl
 git branch -M main
 Write-Host "GitHub へコードをプッシュしています..." -ForegroundColor Yellow
