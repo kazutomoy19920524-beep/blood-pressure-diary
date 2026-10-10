@@ -14,16 +14,28 @@ if (-not (Test-Path ".git")) {
     git commit -m "Initial commit"
 } else {
     git add .
-    git commit -m "Auto update before deploy"
+    git commit -m "Auto update before deploy (v2.1)" -ErrorAction SilentlyContinue
 }
 
-# 2. リポジトリURLの入力
-$repoUrl = Read-Host "GitHub のリポジトリ URL を入力してください (例: https://github.com/username/repository.git)"
+# 2. リポジトリURLの確認 / 入力
+$existingUrl = (git remote get-url origin 2>$null)
 
-if ([string]::IsNullOrWhiteSpace($repoUrl)) {
-    Write-Host "エラー: URLが入力されていません。" -ForegroundColor Red
-    Read-Host "Enterキーを押して終了します..."
-    exit
+if ($existingUrl) {
+    Write-Host "検出されたGitHubリポジトリ: $existingUrl" -ForegroundColor Cyan
+    Write-Host "そのまま使用する場合は、何も入力せず [Enter] キーを押してください。" -ForegroundColor Green
+    $inputUrl = Read-Host "GitHub のリポジトリ URL (または Enter)"
+    if ([string]::IsNullOrWhiteSpace($inputUrl)) {
+        $repoUrl = $existingUrl
+    } else {
+        $repoUrl = $inputUrl.Trim()
+    }
+} else {
+    $repoUrl = Read-Host "GitHub のリポジトリ URL を入力してください (例: https://github.com/username/repository.git)"
+    if ([string]::IsNullOrWhiteSpace($repoUrl)) {
+        Write-Host "エラー: URLが入力されていません。" -ForegroundColor Red
+        Read-Host "Enterキーを押して終了します..."
+        exit
+    }
 }
 
 # リポジトリURLから ユーザー名 と リポジトリ名 を抽出
@@ -34,13 +46,13 @@ if ($repoUrl -match 'github\.com[:/]([^/]+)/([^/\.]+)') {
     $owner = $Matches[1]
     $repo = $Matches[2]
 } else {
-    Write-Host "エラー: GitHub URL の解析に失敗しました。" -ForegroundColor Red
+    Write-Host "エラー: GitHub URL の解析に失敗しました ($repoUrl)" -ForegroundColor Red
     Read-Host "Enterキーを押して終了します..."
     exit
 }
 
 # 3. リモートの設定と Push
-git remote remove origin
+git remote remove origin -ErrorAction SilentlyContinue
 git remote add origin $repoUrl
 git branch -M main
 Write-Host "GitHub へコードをプッシュしています..." -ForegroundColor Yellow
@@ -116,7 +128,18 @@ $profileOutputPath = Join-Path $baseDir $profileFileName
 # UTF-8 (BOMなし) で保存
 [System.IO.File]::WriteAllText($profileOutputPath, $profileXml, [System.Text.Encoding]::UTF8)
 
-Write-Host "iOS用インストーラーファイル ($profileFileName) を生成しました。" -ForegroundColor Green
-Write-Host "デプロイ処理が完了しました！" -ForegroundColor Cyan
+Write-Host "--------------------------------------------------------" -ForegroundColor Cyan
+Write-Host " [OK] iOS用インストーラー ($profileFileName) を生成しました。" -ForegroundColor Green
+Write-Host " [OK] GitHubへのコードプッシュが完了しました！" -ForegroundColor Green
+Write-Host ""
+Write-Host " 📱 あなたの血圧手帳 公開URL (完全HTTPS):" -ForegroundColor Yellow
+Write-Host "    $pagesUrl" -ForegroundColor White
+Write-Host ""
+Write-Host " 【重要: 初回のみ必要なGitHub側の1分設定】" -ForegroundColor Cyan
+Write-Host " 1. ブラウザで以下を開きます:"
+Write-Host "    https://github.com/$owner/$repo/settings/pages"
+Write-Host " 2. 'Branch' を 'None' から 'main' (/(root)) に変更して [Save] をクリック"
+Write-Host " (約1〜2分待つと、世界中どこからでも上記URLで安全にアクセスできます)"
+Write-Host "--------------------------------------------------------" -ForegroundColor Cyan
 
 Read-Host "Enterキーを押して終了します..."

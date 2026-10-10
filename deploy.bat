@@ -1,17 +1,5 @@
 @echo off
-title 血圧手帳 デプロイツール
+title Blood Pressure Deploy
 cd /d "%~dp0"
-
-echo --------------------------------------------------
-echo  血圧手帳デプロイツールを起動しています...
-echo  (実行ポリシーを一時的にバイパスします)
-echo --------------------------------------------------
-echo.
-
-powershell -ExecutionPolicy Bypass -File .\deploy.ps1
-
-echo.
-echo --------------------------------------------------
-echo  処理が終了しました。
-echo --------------------------------------------------
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\deploy.ps1"
 pause

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bp-diary-cache-v1';
+const CACHE_NAME = 'bp-diary-cache-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -7,16 +7,18 @@ const ASSETS = [
   './js/storage.js',
   './js/graph.js',
   './icon.png',
+  './icon_192.png',
   './manifest.json'
 ];
 
 // Install Service Worker and cache core files
 self.addEventListener('install', (e) => {
+  self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[Service Worker] Caching App Shell Assets');
       return cache.addAll(ASSETS);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -36,19 +38,23 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Intercept network requests and serve from cache if offline
+// Network-First strategy: fetch latest from server, fallback to cache if offline
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      
-      // Fallback to network
-      return fetch(e.request).catch(() => {
-        // If offline and request is for HTML, we could return a fallback but our app is single-page, so cached index.html works
-        console.log('[Service Worker] Fetch failed, offline mode active');
-      });
-    })
+    fetch(e.request)
+      .then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseToCache);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        // Offline mode: fallback to cached version
+        console.log('[Service Worker] Offline mode: serving from cache');
+        return caches.match(e.request);
+      })
   );
 });

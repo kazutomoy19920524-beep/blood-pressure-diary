@@ -1096,15 +1096,60 @@ document.addEventListener('DOMContentLoaded', () => {
     showToast('壁紙を初期設定に戻しました');
   });
 
-  // --- Android/Chrome PWA Installer prompts ---
-  window.addEventListener('beforeinstallprompt', (e) => {
-    // Prevent the mini-infobar from appearing on mobile
-    e.preventDefault();
-    // Stash the event so it can be triggered later.
-    deferredPrompt = e;
-    // Update UI notify the user they can install the PWA
-    pwaInstallBanner.style.display = 'flex';
-  });
+  // --- PWA Installation Guide & Prompts ---
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const installBannerText = document.getElementById('install-banner-text');
+  const btnCloseInstallBanner = document.getElementById('btn-close-install-banner');
+
+  if (btnCloseInstallBanner) {
+    btnCloseInstallBanner.addEventListener('click', () => {
+      pwaInstallBanner.style.display = 'none';
+      sessionStorage.setItem('dismiss_install_banner', 'true');
+    });
+  }
+
+  const isDismissed = sessionStorage.getItem('dismiss_install_banner') === 'true';
+
+  if (isStandalone || isDismissed) {
+    // Already installed or user dismissed banner
+    if (pwaInstallBanner) pwaInstallBanner.style.display = 'none';
+  } else {
+    // Show appropriate install guidance based on OS
+    if (isIOS) {
+      if (installBannerText) {
+        installBannerText.innerHTML = `
+          <strong>📱 ホーム画面に追加してアプリ化</strong><br>
+          Safari下の共有ボタン <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: -2px; display: inline-block;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg> を押し、<strong>「ホーム画面に追加」</strong>をタップしてください。
+        `;
+      }
+      if (btnPwaInstall) btnPwaInstall.style.display = 'none';
+      if (pwaInstallBanner) pwaInstallBanner.style.display = 'flex';
+    } else {
+      // Android / Other Browser
+      if (installBannerText) {
+        installBannerText.innerHTML = `
+          <strong>📱 ホーム画面に追加してアプリ化</strong><br>
+          ブラウザ右上のメニュー（︙）から<strong>「ホーム画面に追加」</strong>または「アプリをインストール」をタップしてください。
+        `;
+      }
+      if (btnPwaInstall) btnPwaInstall.style.display = 'none';
+      if (pwaInstallBanner) pwaInstallBanner.style.display = 'flex';
+
+      // If browser supports native install prompt (e.g. Chrome on PC/Android with criteria met)
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (btnPwaInstall) btnPwaInstall.style.display = 'block';
+        if (installBannerText) {
+          installBannerText.innerHTML = `
+            <strong>血圧手帳アプリ</strong><br>
+            ワンタップで端末にインストールできます
+          `;
+        }
+      });
+    }
+  }
 
   btnPwaInstall.addEventListener('click', async () => {
     if (!deferredPrompt) return;
