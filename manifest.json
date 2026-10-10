@@ -2,7 +2,6 @@
   "name": "血圧手帳 - Blood Pressure Diary",
   "short_name": "血圧手帳",
   "description": "サーバー不要で安全に血圧を記録・管理できるスマートフォン向けアプリ",
-  "id": "./",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
