@@ -87,16 +87,30 @@
 
         <!-- Graph Card -->
         <div class="glass-panel graph-card no-press">
-          <div class="graph-header">
-            <div class="graph-title">血圧推移グラフ</div>
-            <div class="graph-filter-container">
-              <button class="graph-filter-btn active" data-days="30">30日間</button>
-              <button class="graph-filter-btn" data-days="60">60日間</button>
-              <button class="graph-filter-btn" data-days="90">90日間</button>
+          <div class="graph-header" style="flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="graph-title">血圧推移グラフ</span>
+              <button type="button" class="icon-btn btn-fullscreen-graph" id="btn-dash-fullscreen" title="全画面表示" style="padding: 4px; color: var(--text-muted);">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
+              </button>
+            </div>
+            <!-- Month Navigator (Synchronized with Calendar) -->
+            <div class="calendar-nav" style="margin: 0; padding: 2px 6px;">
+              <button type="button" class="icon-btn btn-graph-prev" id="btn-dash-graph-prev" title="前月">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+              </button>
+              <span class="graph-month-label" id="dash-graph-month-label" style="font-size: 0.85rem; font-weight: 700; min-width: 80px; text-align: center;">--年--月</span>
+              <button type="button" class="icon-btn btn-graph-next" id="btn-dash-graph-next" title="翌月">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+              </button>
             </div>
           </div>
-          <div class="graph-wrapper" id="dashboard-graph">
+          <div class="graph-wrapper" id="dashboard-graph" style="position: relative;">
             <!-- SVG will render here -->
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 0.72rem; color: var(--text-muted); padding: 0 4px;">
+            <span>👆 左右スワイプで月移動 / 2本指で拡大</span>
+            <button type="button" class="btn-reset-zoom" id="btn-dash-reset-zoom" style="display: none; background: rgba(0,0,0,0.06); border: 1px solid var(--border-color); border-radius: 4px; color: var(--primary); font-size: 0.72rem; cursor: pointer; padding: 2px 8px;">⟲ 全体表示</button>
           </div>
         </div>
 
@@ -173,27 +187,42 @@
         <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px;">朝と夜の血圧を個別に分析し、推移を可視化します。</p>
 
         <!-- Dynamic detailed filters -->
-        <div class="glass-panel" style="padding: 16px; display: flex; flex-direction: column; gap: 16px;" class="no-press">
+        <!-- Analytics Graph Card -->
+        <div class="glass-panel" style="padding: 16px; display: flex; flex-direction: column; gap: 14px;" class="no-press">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span style="font-size: 0.95rem; font-weight: 700;">血圧推移グラフ</span>
+              <button type="button" class="icon-btn btn-fullscreen-graph" id="btn-analytics-fullscreen" title="全画面表示" style="padding: 4px; color: var(--text-muted);">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
+              </button>
+            </div>
+            <!-- Month Navigator (Synchronized with Calendar) -->
+            <div class="calendar-nav" style="margin: 0; padding: 2px 6px;">
+              <button type="button" class="icon-btn btn-graph-prev" id="btn-analytics-graph-prev" title="前月">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+              </button>
+              <span class="graph-month-label" id="analytics-graph-month-label" style="font-size: 0.85rem; font-weight: 700; min-width: 80px; text-align: center;">--年--月</span>
+              <button type="button" class="icon-btn btn-graph-next" id="btn-analytics-graph-next" title="翌月">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+              </button>
+            </div>
+          </div>
+          
           <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">表示データ</span>
+            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted);">表示データ</span>
             <div class="graph-filter-container" id="analytics-type-filter">
               <button class="graph-filter-btn active" data-type="all">すべて</button>
               <button class="graph-filter-btn" data-type="morning">朝のみ</button>
               <button class="graph-filter-btn" data-type="evening">夜のみ</button>
             </div>
           </div>
-          
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">集計期間</span>
-            <div class="graph-filter-container" id="analytics-days-filter">
-              <button class="graph-filter-btn active" data-days="30">30日間</button>
-              <button class="graph-filter-btn" data-days="60">60日間</button>
-              <button class="graph-filter-btn" data-days="90">90日間</button>
-            </div>
-          </div>
 
-          <div class="graph-wrapper" id="analytics-graph" style="height: 240px; margin-top: 10px;">
+          <div class="graph-wrapper" id="analytics-graph" style="height: 240px; margin-top: 4px; position: relative;">
             <!-- SVG detailed graph -->
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2px; font-size: 0.72rem; color: var(--text-muted); padding: 0 4px;">
+            <span>👆 左右スワイプで月移動 / 2本指で拡大</span>
+            <button type="button" class="btn-reset-zoom" id="btn-analytics-reset-zoom" style="display: none; background: rgba(0,0,0,0.06); border: 1px solid var(--border-color); border-radius: 4px; color: var(--primary); font-size: 0.72rem; cursor: pointer; padding: 2px 8px;">⟲ 全体表示</button>
           </div>
         </div>
 
@@ -495,11 +524,42 @@
       <span id="toast-text">保存しました</span>
     </div>
 
+    <!-- Fullscreen Graph Modal -->
+    <div id="modal-fullscreen-graph" class="fullscreen-graph-modal" style="display: none;">
+      <div class="fullscreen-graph-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-weight: 700; font-size: 0.95rem;">📈 血圧推移グラフ</span>
+          <!-- Month nav in fullscreen -->
+          <div class="calendar-nav" style="margin: 0; padding: 2px 8px;">
+            <button type="button" class="icon-btn btn-graph-prev" id="btn-fs-graph-prev" title="前月">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
+            </button>
+            <span class="graph-month-label" id="fs-graph-month-label" style="font-size: 0.9rem; font-weight: 700; min-width: 85px; text-align: center;">--年--月</span>
+            <button type="button" class="icon-btn btn-graph-next" id="btn-fs-graph-next" title="翌月">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+            </button>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button type="button" class="btn-reset-zoom" id="btn-fs-reset-zoom" style="display: none; background: rgba(0,0,0,0.06); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 8px; font-size: 0.75rem; cursor: pointer;">⟲ 全体表示</button>
+          <button type="button" id="btn-close-fullscreen-graph" class="icon-btn" title="閉じる" style="padding: 6px;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="fullscreen-graph-body" id="fullscreen-graph-container">
+        <!-- Fullscreen SVG will render here -->
+      </div>
+      <div style="padding: 6px 12px; font-size: 0.72rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--border-color);">
+        左右スワイプで月移動 / 2本指でピンチ拡大 / 拡大時は左右ドラッグでスクロール
+      </div>
+    </div>
+
   </div>
 
   <!-- App scripts -->
-  <script src="js/storage.js?v=2.1"></script>
-  <script src="js/graph.js?v=2.1"></script>
-  <script src="js/app.js?v=2.1"></script>
+  <script src="js/storage.js?v=3.0"></script>
+  <script src="js/graph.js?v=3.0"></script>
+  <script src="js/app.js?v=3.0"></script>
 </body>
 </html>

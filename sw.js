@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bp-diary-cache-v3';
+const CACHE_NAME = 'bp-diary-cache-v4';
 const ASSETS = [
   './',
   './index.html',

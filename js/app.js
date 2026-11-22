@@ -48,6 +48,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const dashRecordCount = document.getElementById('dash-record-count');
   const dashRecentList = document.getElementById('dashboard-recent-list');
   const dashGraphWrapper = document.getElementById('dashboard-graph');
+  const dashGraphMonthLabel = document.getElementById('dash-graph-month-label');
+  const btnDashGraphPrev = document.getElementById('btn-dash-graph-prev');
+  const btnDashGraphNext = document.getElementById('btn-dash-graph-next');
+  const btnDashFullscreen = document.getElementById('btn-dash-fullscreen');
+  const btnDashResetZoom = document.getElementById('btn-dash-reset-zoom');
 
   // History / Calendar elements
   const historyViewModeFilter = document.getElementById('history-view-mode-filter');
@@ -68,12 +73,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Analytics elements
   const analyticsGraphWrapper = document.getElementById('analytics-graph');
+  const analyticsGraphMonthLabel = document.getElementById('analytics-graph-month-label');
+  const btnAnalyticsGraphPrev = document.getElementById('btn-analytics-graph-prev');
+  const btnAnalyticsGraphNext = document.getElementById('btn-analytics-graph-next');
+  const btnAnalyticsFullscreen = document.getElementById('btn-analytics-fullscreen');
+  const btnAnalyticsResetZoom = document.getElementById('btn-analytics-reset-zoom');
   const statMaxSys = document.getElementById('stat-max-sys');
   const statMinSys = document.getElementById('stat-min-sys');
   const statMaxDia = document.getElementById('stat-max-dia');
   const statMinDia = document.getElementById('stat-min-dia');
   const statAveragePulse = document.getElementById('stat-average-pulse');
   const statRecordCount = document.getElementById('stat-record-count');
+
+  // Fullscreen Graph Modal elements
+  const modalFullscreenGraph = document.getElementById('modal-fullscreen-graph');
+  const fsGraphMonthLabel = document.getElementById('fs-graph-month-label');
+  const btnFsGraphPrev = document.getElementById('btn-fs-graph-prev');
+  const btnFsGraphNext = document.getElementById('btn-fs-graph-next');
+  const btnCloseFullscreenGraph = document.getElementById('btn-close-fullscreen-graph');
+  const btnFsResetZoom = document.getElementById('btn-fs-reset-zoom');
+  const fullscreenGraphContainer = document.getElementById('fullscreen-graph-container');
 
   // Settings elements
   const settingsPrintReportBtn = document.getElementById('settings-print-report');
@@ -352,10 +371,51 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Dynamic UI Renderers ---
 
   /**
+   * Universal Calendar & Graph Month Synchronizer
+   */
+  const updateMonthLabels = () => {
+    const labelText = `${currentCalendarYear}年${String(currentCalendarMonth + 1).padStart(2, '0')}月`;
+    if (calendarCurrentMonth) calendarCurrentMonth.textContent = labelText;
+    if (dashGraphMonthLabel) dashGraphMonthLabel.textContent = labelText;
+    if (analyticsGraphMonthLabel) analyticsGraphMonthLabel.textContent = labelText;
+    if (fsGraphMonthLabel) fsGraphMonthLabel.textContent = labelText;
+  };
+
+  /**
+   * Change month across entire app (Calendar, Dashboard Graph, Analytics Graph, Fullscreen)
+   */
+  const changeCalendarMonth = (delta) => {
+    if (delta < 0) {
+      if (currentCalendarMonth === 0) {
+        currentCalendarMonth = 11;
+        currentCalendarYear -= 1;
+      } else {
+        currentCalendarMonth -= 1;
+      }
+    } else if (delta > 0) {
+      if (currentCalendarMonth === 11) {
+        currentCalendarMonth = 0;
+        currentCalendarYear += 1;
+      } else {
+        currentCalendarMonth += 1;
+      }
+    }
+
+    // Refresh whichever view is active
+    refreshViewData();
+
+    // If Fullscreen graph is open, update it directly
+    if (modalFullscreenGraph && modalFullscreenGraph.style.display !== 'none') {
+      renderFullscreenGraph();
+    }
+  };
+
+  /**
    * Refreshes the active view with latest database records
    */
   const refreshViewData = () => {
     const allRecords = BPStorage.getAll();
+    updateMonthLabels();
 
     if (currentActiveView === 'dashboard') {
       renderDashboard(allRecords);
@@ -375,43 +435,54 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   /**
-   * Render Dashboard View
+   * Render Dashboard View (Synchronized with calendar month)
    */
   const renderDashboard = (records) => {
-    // 1. Render stats (7-day averages)
-    const stats7 = BPStorage.getStats(7);
+    updateMonthLabels();
+
+    // 1. Render stats for targeted calendar month
+    const monthStats = BPStorage.getMonthStats(currentCalendarYear, currentCalendarMonth);
 
     // Morning Averaging
-    if (stats7.morning.count > 0) {
-      dashMorningBP.innerHTML = `${stats7.morning.avgSys}/${stats7.morning.avgDia}<span class="unit">mmHg</span>`;
-      const bpClass = BPStorage.classify(stats7.morning.avgSys, stats7.morning.avgDia);
+    if (monthStats.morning.count > 0) {
+      dashMorningBP.innerHTML = `${monthStats.morning.avgSys}/${monthStats.morning.avgDia}<span class="unit">mmHg</span>`;
+      const bpClass = BPStorage.classify(monthStats.morning.avgSys, monthStats.morning.avgDia);
       dashMorningStatus.textContent = bpClass.label;
       dashMorningStatus.className = `status ${bpClass.colorClass}`;
     } else {
       dashMorningBP.innerHTML = `--/--<span class="unit">mmHg</span>`;
-      dashMorningStatus.textContent = 'データなし';
+      dashMorningStatus.textContent = '測定なし';
       dashMorningStatus.className = 'status';
     }
 
     // Evening Averaging
-    if (stats7.evening.count > 0) {
-      dashEveningBP.innerHTML = `${stats7.evening.avgSys}/${stats7.evening.avgDia}<span class="unit">mmHg</span>`;
-      const bpClass = BPStorage.classify(stats7.evening.avgSys, stats7.evening.avgDia);
+    if (monthStats.evening.count > 0) {
+      dashEveningBP.innerHTML = `${monthStats.evening.avgSys}/${monthStats.evening.avgDia}<span class="unit">mmHg</span>`;
+      const bpClass = BPStorage.classify(monthStats.evening.avgSys, monthStats.evening.avgDia);
       dashEveningStatus.textContent = bpClass.label;
       dashEveningStatus.className = `status ${bpClass.colorClass}`;
     } else {
       dashEveningBP.innerHTML = `--/--<span class="unit">mmHg</span>`;
-      dashEveningStatus.textContent = 'データなし';
+      dashEveningStatus.textContent = '測定なし';
       dashEveningStatus.className = 'status';
     }
 
-    // Total records count
-    dashRecordCount.textContent = `${records.length}件`;
+    // Total records count in this month
+    dashRecordCount.textContent = `${monthStats.totalCount}件`;
 
-    // 2. Render SVG Graph
-    BPGraph.render(dashGraphWrapper, records, 'all', activeDashDays);
+    // 2. Render SVG Graph for synchronized calendar month
+    BPGraph.render(dashGraphWrapper, records, 'all', currentCalendarYear, currentCalendarMonth);
 
-    // 3. Render recent 3 records
+    // 3. Setup Touch gestures: Pinch-to-Zoom, Pan, and Swipe Month
+    BPGraph.setupGestures(
+      dashGraphWrapper,
+      (direction) => changeCalendarMonth(direction),
+      (isZoomed) => {
+        if (btnDashResetZoom) btnDashResetZoom.style.display = isZoomed ? 'block' : 'none';
+      }
+    );
+
+    // 4. Render recent 3 records
     const recent = records.slice(0, 3);
     if (recent.length === 0) {
       dashRecentList.innerHTML = `
@@ -608,14 +679,25 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   /**
-   * Render Analytics View
+   * Render Analytics View (Synchronized with calendar month)
    */
   const renderAnalytics = (records) => {
-    // 1. Render detailed SVG Graph
-    BPGraph.render(analyticsGraphWrapper, records, activeAnalyticsType, activeAnalyticsDays);
+    updateMonthLabels();
 
-    // 2. Fetch stats for summary panel
-    const stats = BPStorage.getStats(activeAnalyticsDays);
+    // 1. Render detailed SVG Graph for synchronized calendar month
+    BPGraph.render(analyticsGraphWrapper, records, activeAnalyticsType, currentCalendarYear, currentCalendarMonth);
+
+    // 2. Setup Touch gestures: Pinch-to-Zoom, Pan, and Swipe Month
+    BPGraph.setupGestures(
+      analyticsGraphWrapper,
+      (direction) => changeCalendarMonth(direction),
+      (isZoomed) => {
+        if (btnAnalyticsResetZoom) btnAnalyticsResetZoom.style.display = isZoomed ? 'block' : 'none';
+      }
+    );
+
+    // 3. Fetch stats for summary panel (current calendar month)
+    const stats = BPStorage.getMonthStats(currentCalendarYear, currentCalendarMonth);
     const activeStats = activeAnalyticsType === 'all' ? stats.overall : stats[activeAnalyticsType];
 
     if (activeStats.count > 0) {
@@ -637,6 +719,46 @@ document.addEventListener('DOMContentLoaded', () => {
       statAveragePulse.textContent = '平均脈拍数: -- bpm';
       statRecordCount.textContent = '測定回数: 0 回';
     }
+  };
+
+  /**
+   * Fullscreen Graph Modal Controls
+   */
+  const openFullscreenGraph = (isAuto = false) => {
+    if (!modalFullscreenGraph) return;
+    modalFullscreenGraph.style.display = 'flex';
+    if (isAuto) {
+      modalFullscreenGraph.dataset.autoOpened = 'true';
+    }
+    renderFullscreenGraph();
+  };
+
+  const closeFullscreenGraph = () => {
+    if (!modalFullscreenGraph) return;
+    modalFullscreenGraph.style.display = 'none';
+    delete modalFullscreenGraph.dataset.autoOpened;
+  };
+
+  const renderFullscreenGraph = () => {
+    updateMonthLabels();
+    const records = BPStorage.getAll();
+    BPGraph.render(
+      fullscreenGraphContainer,
+      records,
+      activeAnalyticsType || 'all',
+      currentCalendarYear,
+      currentCalendarMonth,
+      { isFullscreen: true }
+    );
+
+    // Setup gestures on fullscreen graph
+    BPGraph.setupGestures(
+      fullscreenGraphContainer,
+      (direction) => changeCalendarMonth(direction),
+      (isZoomed) => {
+        if (btnFsResetZoom) btnFsResetZoom.style.display = isZoomed ? 'block' : 'none';
+      }
+    );
   };
 
   /**
@@ -810,11 +932,13 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Statistics (Last 30 days)
-    const stats = BPStorage.getStats(30);
+    // Statistics (Selected Calendar Month)
+    const stats = BPStorage.getMonthStats(currentCalendarYear, currentCalendarMonth);
+    const monthPrefix = `${currentCalendarYear}-${String(currentCalendarMonth + 1).padStart(2, '0')}`;
+    const monthRecords = allRecords.filter(r => r.timestamp && r.timestamp.startsWith(monthPrefix));
 
     // Group records by Japanese Locale Date string for morning/evening representation in table
-    const sorted = [...allRecords].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const sorted = [...monthRecords].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     const rowsByDate = {};
     sorted.forEach(r => {
       const localDate = new Date(r.timestamp).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' });
@@ -863,14 +987,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const d = new Date();
     const printDate = `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+    const targetMonthText = `${currentCalendarYear}年${currentCalendarMonth + 1}月`;
 
     printContainer.innerHTML = `
       <div class="print-report-header">
-        <h1 class="print-report-title">血圧管理レポート</h1>
-        <p style="font-size: 9pt; color: #666; margin: 4px 0 0 0;">出力日: ${printDate} | 血圧手帳</p>
+        <h1 class="print-report-title">血圧管理レポート (${targetMonthText})</h1>
+        <p style="font-size: 9pt; color: #666; margin: 4px 0 0 0;">出力日: ${printDate} | 対象月: ${targetMonthText} | 血圧手帳</p>
       </div>
 
-      <h3 style="font-size: 11pt; margin-top: 0; border-left: 4px solid #ea580c; padding-left: 8px;">📊 直近30日間の統計</h3>
+      <h3 style="font-size: 11pt; margin-top: 0; border-left: 4px solid #ea580c; padding-left: 8px;">📊 ${targetMonthText}の統計</h3>
       <table class="print-stats-table">
         <thead>
           <tr>
@@ -958,26 +1083,60 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshViewData();
   });
 
-  // Calendar Prev/Next month button handlers
-  btnCalendarPrev.addEventListener('click', () => {
-    if (currentCalendarMonth === 0) {
-      currentCalendarMonth = 11;
-      currentCalendarYear -= 1;
-    } else {
-      currentCalendarMonth -= 1;
-    }
-    refreshViewData();
-  });
+  // Universal Month Navigation Buttons (Calendar, Dashboard, Analytics, Fullscreen)
+  if (btnCalendarPrev) btnCalendarPrev.addEventListener('click', () => changeCalendarMonth(-1));
+  if (btnCalendarNext) btnCalendarNext.addEventListener('click', () => changeCalendarMonth(1));
 
-  btnCalendarNext.addEventListener('click', () => {
-    if (currentCalendarMonth === 11) {
-      currentCalendarMonth = 0;
-      currentCalendarYear += 1;
+  if (btnDashGraphPrev) btnDashGraphPrev.addEventListener('click', () => changeCalendarMonth(-1));
+  if (btnDashGraphNext) btnDashGraphNext.addEventListener('click', () => changeCalendarMonth(1));
+
+  if (btnAnalyticsGraphPrev) btnAnalyticsGraphPrev.addEventListener('click', () => changeCalendarMonth(-1));
+  if (btnAnalyticsGraphNext) btnAnalyticsGraphNext.addEventListener('click', () => changeCalendarMonth(1));
+
+  if (btnFsGraphPrev) btnFsGraphPrev.addEventListener('click', () => changeCalendarMonth(-1));
+  if (btnFsGraphNext) btnFsGraphNext.addEventListener('click', () => changeCalendarMonth(1));
+
+  // Fullscreen Graph Buttons
+  if (btnDashFullscreen) btnDashFullscreen.addEventListener('click', () => openFullscreenGraph(false));
+  if (btnAnalyticsFullscreen) btnAnalyticsFullscreen.addEventListener('click', () => openFullscreenGraph(false));
+  if (btnCloseFullscreenGraph) btnCloseFullscreenGraph.addEventListener('click', closeFullscreenGraph);
+
+  // Zoom Reset Buttons
+  if (btnDashResetZoom) {
+    btnDashResetZoom.addEventListener('click', () => {
+      if (dashGraphWrapper && dashGraphWrapper.resetZoom) dashGraphWrapper.resetZoom();
+    });
+  }
+  if (btnAnalyticsResetZoom) {
+    btnAnalyticsResetZoom.addEventListener('click', () => {
+      if (analyticsGraphWrapper && analyticsGraphWrapper.resetZoom) analyticsGraphWrapper.resetZoom();
+    });
+  }
+  if (btnFsResetZoom) {
+    btnFsResetZoom.addEventListener('click', () => {
+      if (fullscreenGraphContainer && fullscreenGraphContainer.resetZoom) fullscreenGraphContainer.resetZoom();
+    });
+  }
+
+  // Device Orientation Listener (Automatic Fullscreen on Landscape tilt)
+  const handleOrientation = () => {
+    // Check if device is in landscape mode
+    const isLandscape = window.matchMedia('(orientation: landscape)').matches || (window.orientation === 90 || window.orientation === -90);
+    // On smartphones/tablets, landscape mode height is typically smaller than 600px
+    if (isLandscape && window.innerHeight < 650) {
+      if (modalFullscreenGraph && modalFullscreenGraph.style.display !== 'flex') {
+        openFullscreenGraph(true);
+      }
     } else {
-      currentCalendarMonth += 1;
+      // Rotated back to portrait -> close if it was opened automatically
+      if (modalFullscreenGraph && modalFullscreenGraph.dataset.autoOpened === 'true') {
+        closeFullscreenGraph();
+      }
     }
-    refreshViewData();
-  });
+  };
+
+  window.addEventListener('resize', handleOrientation);
+  window.addEventListener('orientationchange', handleOrientation);
 
   // "Record this day" button click
   btnCalendarAddRecord.addEventListener('click', () => {

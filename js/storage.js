@@ -174,6 +174,70 @@ class BPStorage {
   }
 
   /**
+   * Calculate summary statistics for a given calendar month
+   * @param {Number} year - Target Year (e.g. 2026)
+   * @param {Number} month - Target Month 0-11
+   * @returns {Object} Calculated stats for the month
+   */
+  static getMonthStats(year, month) {
+    const records = this.getAll();
+    const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const filteredRecords = records.filter(r => r.timestamp && r.timestamp.startsWith(monthPrefix));
+
+    const initStats = () => ({ sumSys: 0, sumDia: 0, sumPulse: 0, count: 0, maxSys: 0, minSys: 999, maxDia: 0, minDia: 999 });
+    const morning = initStats();
+    const evening = initStats();
+    const overall = initStats();
+
+    filteredRecords.forEach(r => {
+      const sys = Number(r.sys);
+      const dia = Number(r.dia);
+      const pulse = Number(r.pulse);
+
+      const update = (stats) => {
+        stats.sumSys += sys;
+        stats.sumDia += dia;
+        stats.sumPulse += pulse;
+        stats.count += 1;
+        if (sys > stats.maxSys) stats.maxSys = sys;
+        if (sys < stats.minSys) stats.minSys = sys;
+        if (dia > stats.maxDia) stats.maxDia = dia;
+        if (dia < stats.minDia) stats.minDia = dia;
+      };
+
+      update(overall);
+      if (r.type === 'morning') {
+        update(morning);
+      } else {
+        update(evening);
+      }
+    });
+
+    const finalize = (stats) => {
+      if (stats.count === 0) {
+        return { avgSys: 0, avgDia: 0, avgPulse: 0, maxSys: 0, minSys: 0, maxDia: 0, minDia: 0, count: 0 };
+      }
+      return {
+        avgSys: Math.round(stats.sumSys / stats.count),
+        avgDia: Math.round(stats.sumDia / stats.count),
+        avgPulse: Math.round(stats.sumPulse / stats.count),
+        maxSys: stats.maxSys,
+        minSys: stats.minSys === 999 ? 0 : stats.minSys,
+        maxDia: stats.maxDia,
+        minDia: stats.minDia === 999 ? 0 : stats.minDia,
+        count: stats.count
+      };
+    };
+
+    return {
+      overall: finalize(overall),
+      morning: finalize(morning),
+      evening: finalize(evening),
+      totalCount: filteredRecords.length
+    };
+  }
+
+  /**
    * Export database records to CSV string
    * @returns {String} CSV content
    */
