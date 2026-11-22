@@ -461,23 +461,6 @@ class BPGraph {
           panX = 0;
           updateViewBox();
         }
-      } else if (!isPinching && scale <= 1.08 && e.changedTouches.length === 1) {
-        // Check for horizontal swipe to change month
-        const touchEndX = e.changedTouches[0].clientX;
-        const touchEndY = e.changedTouches[0].clientY;
-        const diffX = touchEndX - touchStartX;
-        const diffY = touchEndY - touchStartY;
-
-        // Swipe horizontal threshold: 45px distance and predominantly horizontal
-        if (Math.abs(diffX) > 45 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
-          if (diffX > 0) {
-            // Swiped right -> Previous Month
-            if (onSwipeMonth) onSwipeMonth(-1);
-          } else {
-            // Swiped left -> Next Month
-            if (onSwipeMonth) onSwipeMonth(1);
-          }
-        }
       }
       isPanning = false;
     }, { passive: true });

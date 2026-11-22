@@ -53,13 +53,22 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnDashGraphNext = document.getElementById('btn-dash-graph-next');
   const btnDashFullscreen = document.getElementById('btn-dash-fullscreen');
   const btnDashResetZoom = document.getElementById('btn-dash-reset-zoom');
+  const btnDashJumpCalendar = document.getElementById('btn-dash-jump-calendar');
 
-  // History / Calendar elements
+  // History / Calendar / Graph elements
   const historyViewModeFilter = document.getElementById('history-view-mode-filter');
   const btnHistoryListMode = document.getElementById('btn-history-list-mode');
   const btnHistoryCalendarMode = document.getElementById('btn-history-calendar-mode');
+  const btnHistoryGraphMode = document.getElementById('btn-history-graph-mode');
   const historyListContainer = document.getElementById('history-list-container');
   const historyCalendarContainer = document.getElementById('history-calendar-container');
+  const historyGraphContainer = document.getElementById('history-graph-container');
+  const historyGraphWrapper = document.getElementById('history-graph');
+  const historyGraphMonthLabel = document.getElementById('history-graph-month-label');
+  const btnHistoryGraphPrev = document.getElementById('btn-history-graph-prev');
+  const btnHistoryGraphNext = document.getElementById('btn-history-graph-next');
+  const btnHistoryFullscreen = document.getElementById('btn-history-fullscreen');
+  const btnHistoryResetZoom = document.getElementById('btn-history-reset-zoom');
   const fullHistoryList = document.getElementById('full-history-list');
   
   const btnCalendarPrev = document.getElementById('btn-calendar-prev');
@@ -377,6 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const labelText = `${currentCalendarYear}年${String(currentCalendarMonth + 1).padStart(2, '0')}月`;
     if (calendarCurrentMonth) calendarCurrentMonth.textContent = labelText;
     if (dashGraphMonthLabel) dashGraphMonthLabel.textContent = labelText;
+    if (historyGraphMonthLabel) historyGraphMonthLabel.textContent = labelText;
     if (analyticsGraphMonthLabel) analyticsGraphMonthLabel.textContent = labelText;
     if (fsGraphMonthLabel) fsGraphMonthLabel.textContent = labelText;
   };
@@ -423,15 +433,39 @@ document.addEventListener('DOMContentLoaded', () => {
       if (currentHistoryMode === 'list') {
         historyListContainer.style.display = 'block';
         historyCalendarContainer.style.display = 'none';
+        if (historyGraphContainer) historyGraphContainer.style.display = 'none';
         renderHistoryList(allRecords);
+      } else if (currentHistoryMode === 'graph') {
+        historyListContainer.style.display = 'none';
+        historyCalendarContainer.style.display = 'none';
+        if (historyGraphContainer) historyGraphContainer.style.display = 'block';
+        renderHistoryGraph(allRecords);
       } else {
+        // default: calendar
         historyListContainer.style.display = 'none';
         historyCalendarContainer.style.display = 'block';
+        if (historyGraphContainer) historyGraphContainer.style.display = 'none';
         renderCalendar(currentCalendarYear, currentCalendarMonth, allRecords);
       }
     } else if (currentActiveView === 'analytics') {
       renderAnalytics(allRecords);
     }
+  };
+
+  /**
+   * Render History Tab Graph View (Synchronized with calendar month)
+   */
+  const renderHistoryGraph = (records) => {
+    updateMonthLabels();
+    if (!historyGraphWrapper) return;
+    BPGraph.render(historyGraphWrapper, records, 'all', currentCalendarYear, currentCalendarMonth);
+    BPGraph.setupGestures(
+      historyGraphWrapper,
+      (direction) => changeCalendarMonth(direction),
+      (isZoomed) => {
+        if (btnHistoryResetZoom) btnHistoryResetZoom.style.display = isZoomed ? 'block' : 'none';
+      }
+    );
   };
 
   /**
@@ -1066,29 +1100,45 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 150);
   };
 
-  // --- Calendar Navigation & Toggle Events ---
+  // --- Calendar & Graph Navigation & Toggle Events ---
 
-  // History Mode Toggle: List vs Calendar
-  btnHistoryListMode.addEventListener('click', () => {
-    btnHistoryListMode.classList.add('active');
-    btnHistoryCalendarMode.classList.remove('active');
-    currentHistoryMode = 'list';
+  // History Mode Toggle: Calendar, Graph, List
+  const setHistoryMode = (mode) => {
+    currentHistoryMode = mode;
+    const btns = [btnHistoryCalendarMode, btnHistoryGraphMode, btnHistoryListMode];
+    btns.forEach(btn => {
+      if (btn) {
+        if (btn.getAttribute('data-mode') === mode) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      }
+    });
     refreshViewData();
-  });
+  };
 
-  btnHistoryCalendarMode.addEventListener('click', () => {
-    btnHistoryCalendarMode.classList.add('active');
-    btnHistoryListMode.classList.remove('active');
-    currentHistoryMode = 'calendar';
-    refreshViewData();
-  });
+  if (btnHistoryCalendarMode) btnHistoryCalendarMode.addEventListener('click', () => setHistoryMode('calendar'));
+  if (btnHistoryGraphMode) btnHistoryGraphMode.addEventListener('click', () => setHistoryMode('graph'));
+  if (btnHistoryListMode) btnHistoryListMode.addEventListener('click', () => setHistoryMode('list'));
 
-  // Universal Month Navigation Buttons (Calendar, Dashboard, Analytics, Fullscreen)
+  // Dashboard jump directly to Calendar
+  if (btnDashJumpCalendar) {
+    btnDashJumpCalendar.addEventListener('click', () => {
+      switchView('history');
+      setHistoryMode('calendar');
+    });
+  }
+
+  // Universal Month Navigation Buttons (Calendar, Dashboard, History Graph, Analytics, Fullscreen)
   if (btnCalendarPrev) btnCalendarPrev.addEventListener('click', () => changeCalendarMonth(-1));
   if (btnCalendarNext) btnCalendarNext.addEventListener('click', () => changeCalendarMonth(1));
 
   if (btnDashGraphPrev) btnDashGraphPrev.addEventListener('click', () => changeCalendarMonth(-1));
   if (btnDashGraphNext) btnDashGraphNext.addEventListener('click', () => changeCalendarMonth(1));
+
+  if (btnHistoryGraphPrev) btnHistoryGraphPrev.addEventListener('click', () => changeCalendarMonth(-1));
+  if (btnHistoryGraphNext) btnHistoryGraphNext.addEventListener('click', () => changeCalendarMonth(1));
 
   if (btnAnalyticsGraphPrev) btnAnalyticsGraphPrev.addEventListener('click', () => changeCalendarMonth(-1));
   if (btnAnalyticsGraphNext) btnAnalyticsGraphNext.addEventListener('click', () => changeCalendarMonth(1));
@@ -1098,6 +1148,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Fullscreen Graph Buttons
   if (btnDashFullscreen) btnDashFullscreen.addEventListener('click', () => openFullscreenGraph(false));
+  if (btnHistoryFullscreen) btnHistoryFullscreen.addEventListener('click', () => openFullscreenGraph(false));
   if (btnAnalyticsFullscreen) btnAnalyticsFullscreen.addEventListener('click', () => openFullscreenGraph(false));
   if (btnCloseFullscreenGraph) btnCloseFullscreenGraph.addEventListener('click', closeFullscreenGraph);
 
@@ -1105,6 +1156,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnDashResetZoom) {
     btnDashResetZoom.addEventListener('click', () => {
       if (dashGraphWrapper && dashGraphWrapper.resetZoom) dashGraphWrapper.resetZoom();
+    });
+  }
+  if (btnHistoryResetZoom) {
+    btnHistoryResetZoom.addEventListener('click', () => {
+      if (historyGraphWrapper && historyGraphWrapper.resetZoom) historyGraphWrapper.resetZoom();
     });
   }
   if (btnAnalyticsResetZoom) {

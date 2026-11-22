@@ -840,21 +840,59 @@ main {
   line-height: 1.4;
 }
 
+/* --- Calendar Nav 1-Line Force Styles --- */
+.calendar-nav {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  gap: 2px !important;
+  background: var(--bg-card);
+  padding: 2px 8px !important;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  flex-shrink: 0 !important;
+}
+
+.graph-month-label {
+  white-space: nowrap !important;
+  font-size: 0.85rem !important;
+  font-weight: 700 !important;
+  min-width: 78px !important;
+  text-align: center !important;
+  display: inline-block !important;
+  padding: 0 4px !important;
+  color: var(--text-main);
+}
+
 /* --- Fullscreen Graph Modal & Zoom Styles --- */
 .fullscreen-graph-modal {
   position: fixed;
   top: 0;
   left: 0;
+  right: 0;
+  bottom: 0;
   width: 100vw;
   height: 100vh;
   height: 100dvh;
-  background-color: var(--bg-main);
-  z-index: 9999;
+  background-color: #f8fafc !important; /* 完全不透明な白/ライト背景 */
+  z-index: 999999 !important;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
   animation: fadeIn 0.2s ease-out;
+}
+
+@media (prefers-color-scheme: dark) {
+  .fullscreen-graph-modal {
+    background-color: #0f172a !important; /* 完全不透明なダーク背景 */
+  }
+}
+
+body.dark-mode .fullscreen-graph-modal {
+  background-color: #0f172a !important;
 }
 
 .fullscreen-graph-header {
@@ -865,6 +903,7 @@ main {
   background: var(--bg-card);
   border-bottom: 1px solid var(--border-color);
   backdrop-filter: blur(12px);
+  flex-shrink: 0;
 }
 
 .fullscreen-graph-body {
